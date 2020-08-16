@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.15)
+project(HAZEN)
+include_directories(./inc)
+set(SRC ./src/HydraulicNetwork.cpp)
+add_library(HAZEN ${SRC})
