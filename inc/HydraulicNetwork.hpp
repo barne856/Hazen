@@ -2,43 +2,50 @@
 #define HYDRAULICNETWORK
 
 // Standard Library
-#include <cmath>
 #include <memory>
 #include <unordered_set>
+#include <vector>
 
 namespace hazen {
-// forward declarations
+// Forward declare HydraulicLink for use as a pointer in HydraulicNode class.
 class HydraulicLink;
 
 /**
  * @brief A Hydraulic Node in a Hydraulic Network.
  * @details A Hydraulic Node contains an unordered set of Hydraulic Links
- * connected to the Hydraulic Node and the total energy head at the Hydraulic
- * Node.
+ * connected to the Hydraulic Node, an unordered set of lateral Point Flows
+ * to the Hydraulic Node, and the total energy head at the Hydraulic Node.
  *
  */
-struct HydraulicNode {
-  float E{nanf("")}; /**<< Total head energy at this Hydraulic Node.*/
+class HydraulicNode {
+  HydraulicNode();
+  double E; /**< Total head energy at this Hydraulic Node [UNITS = FT].*/
   std::unordered_set<HydraulicLink *>
-      links; /**<< Hydraulic Links connected to this Hydraulic Node.*/
+      links; /**< Hydraulic Links connected to this Hydraulic Node.*/
+  std::vector<double>
+      point_flows; /**< The lateral point flows generating additional flow to
+                         the Hydraulic Node [UNITS = CFS].*/
+  double continuity(); /**< Returns the sum of the flow into the Hydraulic Node
+                         minus the sum of the flow out of the Hydraulic Node
+                         [UNITS = CFS].*/
 };
 
 /**
  * @brief An abstract class for a Hydraulic Link in a Hydraulic Network.
- * @details A Hydraulic Link contatins the signed flow through the Hydraulic
- * Link and the upstream and downstream Hydraulic Nodes. Concrete classes
- * inherited from the Hydraulic Link class implement the head loss calculation
- * for that specific Hydraulic Link.
+ * @details A Hydraulic Link contains the signed flow through the Hydraulic
+ * Link. Concrete classes inherited from the Hydraulic Link class implement the
+ * head loss calculation for that specific Hydraulic Link.
  *
  */
 class HydraulicLink {
 public:
-  float Q{nanf("")}; /**<< The signed flow through the Hydraulic Link from the
-              upstream Hydraulic Node to the downstream Hydraulic Node.*/
-  HydraulicNode *up_node{nullptr}; /**<< The upstream Hydraulic Node.*/
-  HydraulicNode *dn_node{nullptr}; /**<< The downstream Hydraulic Node.*/
-  virtual float head_loss() = 0;   /**<< Calculate the head loss from the
-                                      downstream to the upstream Hydraulic Node.*/
+  HydraulicLink();
+  double Q; /**< The signed flow through the Hydraulic Link [UNITS = CFS].*/
+  HydraulicNode *up_node; /**< The upstream Hydraulic Node.*/
+  HydraulicNode *dn_node; /**< The downstream Hydraulic Node.*/
+  virtual double
+  head_loss() = 0; /**< Calculate the head loss from the
+                      downstream to the upstream Hydraulic Node [UNITS = FT].*/
 };
 
 /**
@@ -48,47 +55,30 @@ public:
  */
 class HydraulicComponent {
 protected:
-  std::unordered_set<std::shared_ptr<HydraulicNode>> nodes;
-  std::unordered_set<std::shared_ptr<HydraulicLink>> links;
+  std::unordered_set<std::shared_ptr<HydraulicNode>>
+      nodes; /**< The Hydraulic Nodes used in the Hydraulic Component.*/
+  std::unordered_set<std::shared_ptr<HydraulicLink>>
+      links; /**< The Hydraulic Links used in the Hydraulic Component.*/
 };
 
 /**
- * @brief A Point Flow that is applied to a Hydraulic Node in a Hydraulic
- * Network as a generator of additional flow to the Hydraulic Node.
+ * @brief A Hydraulic Network of Hydraulic Components and Flows.
+ * @details The Hydraulic Network class contains Hydraulic Components that
+ * describe a Hydraulic System.
  *
  */
-struct PointFlow {
-  float Q{nanf("")};   /**<< The additional inflow to a Hydraulic Node.*/
-  HydraulicNode *node; /**<< The Hydraulic Node to apply the point flow to.*/
-};
-
-/**
- * @brief A spatially Varied Flow that is applied to a Hydraulic Link in a
- * Hydraulic Network as a generator of additional flow to the Hydraulic Link.
- * @details The spatially Varied Flow varies linearly from the upstream
- * Hydraulic Node to the downstream Hydraulic Node of the Hydraulic Link for
- * which it is applied.
- *
- */
-struct VariedFlow {
-  float Qup{nanf("")}; /**<< The additional inflow to a Hydraulic Link at the
-                          upstream Node.*/
-  float Qdn{nanf("")}; /**<< The additional inflow to a Hydraulic Node at the
-                          downstream Node.*/
-  HydraulicLink
-      *link; /**<< The Hydraulic Link to apply the varied flow across.*/
-};
-
 class HydraulicNetwork {
 public:
-  void add_point_flow(std::shared_ptr<PointFlow> point_flow);
-  void add_varied_flow(std::shared_ptr<VariedFlow> varied_flow);
+  /**
+   * @brief Add a Hydraulic Component to the Hydraulic Network.
+   *
+   * @param component The Hydraulic Component to add to the Hydraulic Network.
+   */
   void add_component(std::shared_ptr<HydraulicComponent> component);
 
 private:
-  std::unordered_set<std::shared_ptr<PointFlow>> point_flows;
-  std::unordered_set<std::shared_ptr<VariedFlow>> varied_flows;
-  std::unordered_set<std::shared_ptr<HydraulicComponent>> components;
+  std::unordered_set<std::shared_ptr<HydraulicComponent>>
+      components; /**< The Hydraulic Components in the Hydraulic Network.*/
 };
 
 } // namespace hazen
