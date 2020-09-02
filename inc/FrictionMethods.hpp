@@ -21,7 +21,8 @@ public:
    * [UNITS = FT].
    * @return double The slope of the EGL at a point along the Conduit.
    */
-  virtual double friction_slope(HydraulicShape *shape, double Q, double depth) = 0;
+  virtual double friction_slope(HydraulicShape *shape, double Q,
+                                double depth) = 0;
 };
 
 /**
@@ -44,7 +45,8 @@ public:
    * @param Q The flow through the Conduit [UNITS = CFS].
    * @param depth The depth of flow in the Conduit at the calculation point
    * [UNITS = FT].
-   * @return double The slope of the EGL at a point along the Conduit.
+   * @return double The slope of the EGL at a point along the Conduit [UNITS =
+   * FT].
    */
   double friction_slope(HydraulicShape *shape, double Q, double depth);
   double n; /**< Manning's n coefficient used in Manning's Equation.*/
@@ -70,7 +72,8 @@ public:
    * @param Q The flow through the Conduit [UNITS = CFS].
    * @param depth The depth of flow in the Conduit at the calculation point
    * [UNITS = FT].
-   * @return double The slope of the EGL at a point along the Conduit.
+   * @return double The slope of the EGL at a point along the Conduit[UNITS =
+   * FT].
    */
   double friction_slope(HydraulicShape *shape, double Q, double depth);
   double C; /**< C friction coefficient used in the Hazen-Williams Equation.*/
@@ -94,6 +97,8 @@ public:
   /**
    * @brief An implementation of Darcy-Weisbach Equation to calculate the slope
    * of the Energy Grade Line (EGL) in a Conduit.
+   * @return double The slope of the EGL at a point along the Conduit[UNITS =
+   * FT].
    *
    */
   double friction_slope(HydraulicShape *shape, double Q, double depth);

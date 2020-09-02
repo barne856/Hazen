@@ -70,10 +70,9 @@ public:
    * @param friction_method The Friction Method to use.
    */
   void set_friction_method(std::shared_ptr<FrictionMethod> friction_method);
-  std::vector<vec3>
-      invert_alignment; /**< The physical x,y,z coordinates of the invert of the
-                           passage along the alignment in space [UNITS =
-                           FT,FT,FT].*/
+  alignment invert_alignment; /**< The physical x,y,z coordinates of the invert
+                                 of the passage along the alignment in space
+                                 [UNITS = FT,FT,FT].*/
 
 private:
   std::shared_ptr<HydraulicShape>
@@ -86,8 +85,8 @@ private:
 /**
  * @brief The Opening Hydraulic Link will compute the head loss through an
  * Orifice or Weir.
- * @details The Weir/Orifice can be a free discharge, partially submerged, or
- * fully submerged.
+ * @details Both sharp crested and broad crested weirs/orifices are
+ * allowed. Both submerged and unsubmerged weirs/orifices are allowed.
  *
  */
 class OpeningLink : public HydraulicLink {
