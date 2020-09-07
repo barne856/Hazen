@@ -1,6 +1,6 @@
 #include "HydraulicUtil.hpp"
 #include <algorithm>
-#include <assert>
+#include <assert.h>
 #include <exception>
 #include <iostream>
 #include <math.h>
@@ -37,17 +37,6 @@ double darcy_friction_factor(double Re, double Dh, double eps) {
   double f3 = 0.88 * log(6.82 * Dh / eps);
   return pow(f1, a) * pow(f2, 2.0 * (a - 1.0) * b) *
          pow(f3, 2.0 * (a - 1.0) * (1.0 - b));
-}
-
-double bernoulli_velocity(double h) {
-  double V;
-  try {
-    V = sqrt(2.0 * g * h);
-  } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
-    V = 0.0;
-  }
-  return V;
 }
 
 double normal_depth(HydraulicShape *shape, FrictionMethod *friction, double S,
@@ -261,8 +250,8 @@ double interp_1D(std::vector<std::pair<double, double>> &func, double x) {
       }
     }
   }
-  double m = (p2.y - p1.y) / (p2.x - p1.x);
-  double b = p1.y - m * p1.x;
+  double m = (p2.second - p1.second) / (p2.first - p1.first);
+  double b = p1.second - m * p1.first;
   return m * x + b;
 }
 

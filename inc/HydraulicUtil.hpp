@@ -1,3 +1,5 @@
+#ifndef HYDRAULICUTIL
+#define HYDRAULICUTIL
 #include "FrictionMethods.hpp"
 #include "HydraulicShapes.hpp"
 #include <functional>
@@ -70,15 +72,6 @@ double froude(double V, double h);
  * @return double The darcy friction factor for the passage.
  */
 double darcy_friction_factor(double Re, double Dh, double eps);
-
-/**
- * @brief Compute the flow velocity as a function of depth from the surface of
- * an infinite reservoir discharging into the atmosphere.
- *
- * @param h The depth from the surface of the infinite reservoir.
- * @return double The flow velocity at the given depth.
- */
-double bernoulli_velocity(double h);
 
 /**
  * @brief Calculate the normal depth (uniform flow depth) at the current flow
@@ -233,12 +226,13 @@ double RK4(std::function<double(double, double)> F, double yi, double xi,
            double dx);
 
 /**
- * @brief Linearly interpolate a function of a single variable given as a vector of x,y
- * pairs.
+ * @brief Linearly interpolate a function of a single variable given as a vector
+ * of x,y pairs.
  *
  * @param x The x value to interpolate
  * @return double The interpolated y value at x
  */
-double interp_1D(std::vector<std::pair<double, double>>& func, double x);
+double interp_1D(std::vector<std::pair<double, double>> &func, double x);
 
 } // namespace hazen
+#endif

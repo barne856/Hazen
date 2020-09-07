@@ -1,8 +1,10 @@
 // Manhole
 // Storage
 // Outfall
-// Conduit/Channel
-// Weir/Orifice
+// Passage
+// Opening
+
+// Not yet implemented
 // Pump
 // Slide Gate
 // Plug Valve
@@ -13,3 +15,4 @@
 // Baffle
 // Flume
 // Granular Filter
+// Diffuser

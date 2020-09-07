@@ -9,8 +9,10 @@ include_directories(./inc)
 set(LIB_SRC
 ./src/FrictionMethods.cpp
 ./src/HeadLoss.cpp
-./src/HydraulicUtil.cpp
+./src/HydraulicLinks
+./src/HydraulicNetwork
 ./src/HydraulicShapes.cpp
+./src/HydraulicUtil.cpp
 )
 
 set(TEST_SRC

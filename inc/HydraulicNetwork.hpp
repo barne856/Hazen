@@ -18,8 +18,9 @@ class HydraulicLink;
  *
  */
 class HydraulicNode {
+public:
   HydraulicNode();
-  double E; /**< Total head energy at this Hydraulic Node [UNITS = FT].*/
+  double H; /**< Piezometric at this Hydraulic Node [UNITS = FT].*/
   std::unordered_set<HydraulicLink *>
       links; /**< Hydraulic Links connected to this Hydraulic Node.*/
   std::vector<double>

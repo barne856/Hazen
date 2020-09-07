@@ -3,13 +3,16 @@
 
 namespace hazen {
 
-double minor_loss(double V, double K) { return K * V * V / (2.0 * g); }
 double gvf_backwater_loss(HydraulicShape *shape, FrictionMethod *friction,
                           vec3 up_inv, vec3 dn_inv, double Q, double H,
                           double dx, double &jump_x, double x_start,
                           double x_final) {
   double x = x_start;               // starting distance in the x direction
   double S = slope(dn_inv, up_inv); // bottom slope.
+  if (Q <= 0.0) {
+    jump_x = nan("");
+    return std::max(S * x + dn_inv.z, H);
+  }
   if (S == std::numeric_limits<double>::infinity()) {
     // vertical pipe with discharge at the bottom, always calculates full length
     double Sf = friction->friction_slope(shape, Q, shape->get_max_depth());
@@ -41,6 +44,10 @@ double gvf_backwater_loss(HydraulicShape *shape, FrictionMethod *friction,
   }
   // downstream control point depth cannot be less than critical depth.
   h = std::max(dc, h);
+  if(dn == std::numeric_limits<double>::infinity())
+  {
+    h = a*shape->get_max_depth();
+  }
   double L = horizontal_length(dn_inv, up_inv);
   L = std::min(x_final, L);
   std::function<double(double, double)> dhdx =
@@ -91,6 +98,9 @@ double gvf_frontwater_loss(HydraulicShape *shape, FrictionMethod *friction,
                            double dx, double x_start, double x_final) {
   double x = x_start;               // starting distance in the x direction
   double S = slope(dn_inv, up_inv); // bottom slope.
+  if (Q <= 0.0) {
+    return std::max(up_inv.z - S * x, H);
+  }
   if (S == std::numeric_limits<double>::infinity()) {
     // vertical pipe with discharge at the bottom, always calculates full length
     double Sf = friction->friction_slope(shape, Q, shape->get_max_depth());
@@ -124,19 +134,19 @@ double gvf_frontwater_loss(HydraulicShape *shape, FrictionMethod *friction,
   L = std::min(x_final, L);
   std::function<double(double, double)> dhdx =
       [shape, friction, Q, a, S, dx, dc](double x, double h) -> double {
-    // double d = h / a; // large angle correction
-    // double Sf = friction->friction_slope(shape, Q, d);
-    // // approximate without froude number
-    // return (Sf - S);
-
     double d = h / a; // large angle correction
     double Sf = friction->friction_slope(shape, Q, d);
-    double Fr = shape->froude(Q, d);
-    if (abs(1.0 - Fr * Fr) < 0.01 * dx / d || d > dc) {
-      // remove discontinuity around critical depth
-      Fr = 2.0;
-    }
-    return (S - Sf) / (1.0 - Fr * Fr);
+    // approximate without froude number
+    return (Sf - S);
+
+    // double d = h / a; // large angle correction
+    // double Sf = friction->friction_slope(shape, Q, d);
+    // double Fr = shape->froude(Q, d);
+    // if (abs(1.0 - Fr * Fr) < 0.01 * dx / d || d > dc) {
+    //   // remove discontinuity around critical depth
+    //   Fr = 2.0;
+    // }
+    // return (S - Sf) / (1.0 - Fr * Fr);
   };
   while (x <= L - dx) {
     // calculate next h using Runge-Kutta method.
@@ -197,11 +207,11 @@ double opening_loss(HydraulicShape *shape, double Cd, double opening_invert,
   double h1 = find_goal_bisection(Q, h2, b, 0.0000001, objective);
   return opening_invert + h1;
 }
-double pump_loss(std::vector<std::pair<double, double>> flow_head_curve,
-                 double discharge_elevation, double Q, double E) {
-  double h = E - discharge_elevation;
-  h = -std::min(h, 0.0);
-  return interp_1D(flow_head_curve, Q)+h;
-}
+// double pump_loss(std::vector<std::pair<double, double>> flow_head_curve,
+//                  double discharge_elevation, double Q, double E) {
+//   double h = E - discharge_elevation;
+//   h = -std::min(h, 0.0);
+//   return interp_1D(flow_head_curve, Q)+h;
+// }
 
 } // namespace hazen

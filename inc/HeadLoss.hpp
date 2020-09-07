@@ -13,21 +13,12 @@
 
 // Head Loss APIs
 namespace hazen {
-/**
- * @brief Compute the head loss though a fitting or other junction due to
- * turbulence and fluid-wall separation.
- *
- * @param V The velocity used in the head loss calculation [UNITS = FPS].
- * @param K The minor loss coefficient used in the head loss calculation.
- * @return double The minor head loss [UNITS = FT].
- */
-double minor_loss(double V, double K);
 
 /**
  * @brief Compute the piezometric head loss through a prismatic channel or
  * conduit using the Gradually Varied Flow (GVF) equation. The function does not
  * use the small angle assumption and so works well with aggressivly sloped
- * pipes and even vertical pipes.
+ * pipes and even handles vertical pipes.
  * @details This function integrates the GVF equation starting from a downstream
  * control point using the Fourth Order Runge-Kutta (RK4) numerical integration
  * method. This function should only be used with non-steep passages where the
@@ -38,6 +29,8 @@ double minor_loss(double V, double K);
  * submerged above the critical depth and a hydraulic jump occurs, the function
  * will return NaN and set the variable \p jump_x to the horizontal distance of
  * the jump as measured from the downstream end of the passage.
+ *
+ * If a hydraulic jump does not occur, jump_x will be set to NaN.
  *
  * @param shape The cross-sectional shape of the passage. May be a closed
  * conduit or an open channel.
@@ -107,8 +100,7 @@ gvf_backwater_loss(HydraulicShape *shape, FrictionMethod *friction, vec3 up_inv,
  * the alignment to use as the stopping point of the calculation. Default is
  * infinity which means the downstream end is used as the ending point for
  * calculations [UNITS = FT].
- * @return double The upstream piezometric head of the passage or NaN if a
- * hydraulic jump occured [UNITS = FT].
+ * @return double The downstream piezometric head [UNITS = FT].
  */
 double
 gvf_frontwater_loss(HydraulicShape *shape, FrictionMethod *friction,
@@ -155,22 +147,22 @@ gvf_frontwater_loss(HydraulicShape *shape, FrictionMethod *friction,
  */
 double opening_loss(HydraulicShape *shape, double Cd, double opening_invert,
                     double Q, double H, double dy, double percent_open = 1.0);
-/**
- * @brief Compute the head loss through a Pump.
- * @details The head loss will be negative if the Pump imparts energy to the
- * fluid.
- *
- * @param flow_head_curve The Pump's flow-head curve. first() is flow in CFS,
- * second() is head in FT.
- * @param discharge_elevation The Pump's discharge elevation. This is the
- * discharge of the actual Pump, not any piping that may be connected to the
- * Pump discharge [UNITS = FT].
- * @param Q The flow through the Pump [UNITS = CFS].
- * @param E The downstream energy head of the Pump [UNITS = FT].
- * @return double The head loss due to the Pump.
- */
-double pump_loss(std::vector<std::pair<double, double>> flow_head_curve,
-                 double discharge_elevation, double Q, double E);
+// /**
+//  * @brief Compute the head loss through a Pump.
+//  * @details The head loss will be negative if the Pump imparts energy to the
+//  * fluid.
+//  *
+//  * @param flow_head_curve The Pump's flow-head curve. first() is flow in CFS,
+//  * second() is head in FT.
+//  * @param discharge_elevation The Pump's discharge elevation. This is the
+//  * discharge of the actual Pump, not any piping that may be connected to the
+//  * Pump discharge [UNITS = FT].
+//  * @param Q The flow through the Pump [UNITS = CFS].
+//  * @param E The downstream energy head of the Pump [UNITS = FT].
+//  * @return double The head loss due to the Pump.
+//  */
+// double pump_loss(std::vector<std::pair<double, double>> flow_head_curve,
+//                  double discharge_elevation, double Q, double E);
 } // namespace hazen
 
 #endif

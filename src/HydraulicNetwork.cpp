@@ -3,7 +3,7 @@
 
 namespace hazen {
 
-HydraulicNode::HydraulicNode() : E(nan("")) {}
+HydraulicNode::HydraulicNode() : H(nan("")) {}
 double HydraulicNode::continuity() {
   double Q = 0.;
   for (const auto &link : links) {
