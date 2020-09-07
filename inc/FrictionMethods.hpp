@@ -7,7 +7,7 @@
 namespace hazen {
 /**
  * @brief An Abstract Friction Method used to calculate head losses in the
- * Conduit Hydraulic Link.
+ * Conduit Hydraulic Link..
  */
 class FrictionMethod {
 public:
