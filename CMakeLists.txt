@@ -6,20 +6,8 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 include_directories(./inc)
 
-set(LIB_SRC
-./src/FrictionMethods.cpp
-./src/HeadLoss.cpp
-./src/HydraulicLinks
-./src/HydraulicNetwork
-./src/HydraulicShapes.cpp
-./src/HydraulicUtil.cpp
-)
 
 set(TEST_SRC
-./src/tests/hydraulic_util_test.cpp)
-
-add_library(HAZEN SHARED ${LIB_SRC})
+./src/tests/vectors_example.cpp)
 
 add_executable(test ${TEST_SRC})
-
-target_link_libraries(test HAZEN)

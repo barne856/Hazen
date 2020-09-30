@@ -147,6 +147,27 @@ gvf_frontwater_loss(HydraulicShape *shape, FrictionMethod *friction,
  */
 double opening_loss(HydraulicShape *shape, double Cd, double opening_invert,
                     double Q, double H, double dy, double percent_open = 1.0);
+
+/**
+ * @brief compute the headloss through the manhole
+ *
+ * @param E_ai  initial estimate of energy level
+ * @param E_i Downstream energy level
+ * @param manhole_invert manhole invert elevation
+ * @param Q_total Total flow flowing out of the manhole
+ * @param D_outlet outlet hydraulics diameter when flowing full
+ * @param C_B coefficient of benching
+ * @param Q_j vector of flows from inflow pipes (individual pipe upstream flow)
+ * @param invert_j Invert of the respective upstream pipes
+ * @param theta_j angles, in degrees, between individual upstream pipes and
+ * outlet pipe. Must be between 0 and 180.
+ * @return double energy head in the manhole
+ */
+double manhole_loss(double E_ai, double E_i, double manhole_invert,
+                    double Q_total, double D_outlet, double C_B,
+                    std::vector<double> Q_j, std::vector<double> invert_j,
+                    std::vector<double> theta_j);
+
 // /**
 //  * @brief Compute the head loss through a Pump.
 //  * @details The head loss will be negative if the Pump imparts energy to the

@@ -44,9 +44,8 @@ double gvf_backwater_loss(HydraulicShape *shape, FrictionMethod *friction,
   }
   // downstream control point depth cannot be less than critical depth.
   h = std::max(dc, h);
-  if(dn == std::numeric_limits<double>::infinity())
-  {
-    h = a*shape->get_max_depth();
+  if (dn == std::numeric_limits<double>::infinity()) {
+    h = a * shape->get_max_depth();
   }
   double L = horizontal_length(dn_inv, up_inv);
   L = std::min(x_final, L);
@@ -207,6 +206,65 @@ double opening_loss(HydraulicShape *shape, double Cd, double opening_invert,
   double h1 = find_goal_bisection(Q, h2, b, 0.0000001, objective);
   return opening_invert + h1;
 }
+
+double manhole_loss(double E_ai, double E_i, double manhole_invert,
+                    double Q_total, double D_outlet, double C_B,
+                    std::vector<double> Q_j, std::vector<double> invert_j,
+                    std::vector<double> theta_j) {
+  double H_B = C_B * (E_ai - E_i); // headloss due to benching
+  // find all non-plunging flows
+  std::vector<double> non_plunging_invert_j{};
+  std::vector<double> non_plunging_theta_j{};
+  std::vector<double> non_plunging_Q_j{};
+  for (int i = 0; i < invert_j.size(); i++) {
+    if (invert_j[i] < E_ai) {
+      // pipe is submerged
+      non_plunging_invert_j.push_back(invert_j[i]);
+      non_plunging_theta_j.push_back(theta_j[i]);
+      non_plunging_Q_j.push_back(Q_j[i]);
+    }
+  }
+  // theta_w
+  double numerator;
+  for (int i = 0; i < non_plunging_theta_j.size(); i++) {
+    numerator += non_plunging_Q_j[i] * non_plunging_theta_j[i];
+  }
+  double sum_of_non_plunging_flows;
+  for (int i = 0; i < non_plunging_theta_j.size(); i++) {
+    sum_of_non_plunging_flows += non_plunging_Q_j[i];
+  }
+  double theta_w = 180.0;
+  if (non_plunging_theta_j.size() > 0) {
+    theta_w = numerator / sum_of_non_plunging_flows;
+  }
+  double C_theta =
+      4.5 * (sum_of_non_plunging_flows / Q_total) * cos(theta_w / 2.0);
+  double H_theta = C_theta * (E_ai - E_i); // headloss due to angle of inflow.
+
+  // find all plunging flows
+  std::vector<double> plunging_invert_j{};
+  std::vector<double> plunging_theta_j{};
+  std::vector<double> plunging_Q_j{};
+  std::vector<double> h_k{};
+  for (int i = 0; i < invert_j.size(); i++) {
+    if (invert_j[i] >= E_ai) {
+      // pipe is plunging
+      plunging_invert_j.push_back(invert_j[i]);
+      plunging_theta_j.push_back(theta_j[i]);
+      plunging_Q_j.push_back(Q_j[i]);
+      h_k.push_back((invert_j[i] - E_ai) / D_outlet);
+    }
+  }
+  double C_P = 0.0;
+  for (int i = 0; i < h_k.size(); i++) {
+    C_P += plunging_Q_j[i] * h_k[i];
+  }
+  C_P /= Q_total;
+  double H_P = C_P * (E_ai - E_i);  // headloss due to plunging.
+  double H_a = H_B + H_theta + H_P; // total headloss due to the manhole.
+  return H_a + E_ai; // return the total energy head in the manhole.
+}
+
 // double pump_loss(std::vector<std::pair<double, double>> flow_head_curve,
 //                  double discharge_elevation, double Q, double E) {
 //   double h = E - discharge_elevation;
