@@ -9,8 +9,8 @@ namespace hazen {
  * @brief A Hydraulic Shape used by a Hydraulic Link to describe the
  * cross-sectional area of some Hydraulic Component.
  * @details All Hydraulic Shapes provide functions for the top width, wetted
- * perimeter, flow area, hydraulic radius, and hydraulic diameter at a user
- * specified depth.
+ * perimeter, flow area, hydraulic depth, hydraulic radius, and hydraulic
+ * diameter at a user specified flow depth.
  *
  */
 class HydraulicShape {
@@ -47,6 +47,20 @@ public:
    * returned.
    */
   double get_max_depth();
+  /**
+   * @brief Get the shape height
+   *
+   * @return double The shape height.
+   */
+  double get_shape_height();
+  /**
+   * @brief Is the flow free surface or pressure driven?
+   *
+   * @param depth
+   * @return true The flow is free surface.
+   * @return false The flow is pressure driven.
+   */
+  bool is_free_surface(double depth);
   /**
    * @brief The Froude number of the shape with a given flow and depth of flow.
    *
@@ -85,6 +99,8 @@ public:
    * dimension of the shape.
    */
   virtual double flow_area(double depth) = 0;
+
+protected:
   double height; /**< The maximum height of the shape when a closed top shape is
                     used.*/
   bool is_open;  /**< If true, the shape is treated as if it had infinite
@@ -113,7 +129,9 @@ public:
   double top_width(double depth);
   double wetted_perimeter(double depth);
   double flow_area(double depth);
-  double length; /**< The horizontal length of the Rectangle.*/
+
+private:
+  double width; /**< The horizontal width of the Rectangle.*/
 };
 
 /**
@@ -121,13 +139,15 @@ public:
  *
  */
 class VNotch : public HydraulicShape {
-  VNotch(double angle, double height, double overflow_length,
+  VNotch(double angle, double overflow_width, double height,
          bool is_open = true);
   double top_width(double depth);
   double wetted_perimeter(double depth);
   double flow_area(double depth);
-  double angle;           /**< The angle of the V-Notch.*/
-  double overflow_length; /**< The horizontal length to use when depth > height
+
+private:
+  double angle;          /**< The angle of the V-Notch.*/
+  double overflow_width; /**< The horizontal length to use when depth > height
                              and is_open = true.*/
 };
 
@@ -137,17 +157,20 @@ class VNotch : public HydraulicShape {
  */
 class Cipolletti : public HydraulicShape {
 public:
-  Cipolletti(double top_length, double bottom_length, double height,
-             double overflow_length, bool is_open = true);
+  Cipolletti(double top_width, double bottom_width, double overflow_width,
+             double height, bool is_open = true);
   double top_width(double depth);
   double wetted_perimeter(double depth);
   double flow_area(double depth);
-  double bottom_length; /**< The horizontal length of the bottom of the
+
+private:
+  double cusp_width; /**< The horizontal length of the top of the trapezoid when
+                        depth = height.*/
+  double bottom_width; /**< The horizontal length of the bottom of the
                            trapezoid. Must be larger than or equal to zero. A
                            zero here represents a V-Notch shape.*/
-  double top_length; /**< The horizontal length of the top of the trapezoid when
-                        depth = height.*/
-  double overflow_length; /**< The horizontal length to use when depth > height
+
+  double overflow_width; /**< The horizontal length to use when depth > height
                              and is_open = true.*/
 };
 

@@ -3,6 +3,7 @@
 
 // Standard Library
 #include <memory>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -20,7 +21,8 @@ class HydraulicLink;
 class HydraulicNode {
 public:
   HydraulicNode();
-  double H; /**< Piezometric at this Hydraulic Node [UNITS = FT].*/
+  ~HydraulicNode();
+  double H; /**< The energy head at this Hydraulic Node [UNITS = FT].*/
   std::unordered_set<HydraulicLink *>
       links; /**< Hydraulic Links connected to this Hydraulic Node.*/
   std::vector<double>
@@ -41,12 +43,31 @@ public:
 class HydraulicLink {
 public:
   HydraulicLink();
+  ~HydraulicLink();
   double Q; /**< The signed flow through the Hydraulic Link [UNITS = CFS].*/
   HydraulicNode *up_node; /**< The upstream Hydraulic Node.*/
   HydraulicNode *dn_node; /**< The downstream Hydraulic Node.*/
+  std::vector<std::pair<double, double>>
+      HGL; /**< The HGL profile from downstream node to upstream node.*/
   virtual double
   head_loss() = 0; /**< Calculate the head loss from the
                       downstream to the upstream Hydraulic Node [UNITS = FT].*/
+  /**
+   * @brief Get the maximum water surface elevation of the downstream links
+   * upstream ends.
+   *
+   * @return double The downstream water surface elevaiton of this link.
+   */
+  double get_downstream_water_surface();
+  /**
+   * @brief Get the downstream velocity of the link.
+   * @details The shape of the first downstream passage is used.
+   *
+   * @return double The downstream velocity [UNITS = FPS].
+   */
+  double get_downstream_velocity();
+  void set_up_node(HydraulicNode *node);
+  void set_dn_node(HydraulicNode *node);
 };
 
 /**
@@ -55,31 +76,25 @@ public:
  *
  */
 class HydraulicComponent {
-protected:
-  std::unordered_set<std::shared_ptr<HydraulicNode>>
-      nodes; /**< The Hydraulic Nodes used in the Hydraulic Component.*/
-  std::unordered_set<std::shared_ptr<HydraulicLink>>
-      links; /**< The Hydraulic Links used in the Hydraulic Component.*/
-};
-
-/**
- * @brief A Hydraulic Network of Hydraulic Components and Flows.
- * @details The Hydraulic Network class contains Hydraulic Components that
- * describe a Hydraulic System.
- *
- */
-class HydraulicNetwork {
 public:
-  /**
-   * @brief Add a Hydraulic Component to the Hydraulic Network.
-   *
-   * @param component The Hydraulic Component to add to the Hydraulic Network.
-   */
-  void add_component(std::shared_ptr<HydraulicComponent> component);
+  ~HydraulicComponent();
+  virtual void bind(std::pair<HydraulicComponent *, unsigned int> bind_point,
+                    unsigned int binding_index) = 0;
+  void unbind(unsigned int binding_index);
+
+protected:
+  virtual HydraulicNode *get_binding_node(unsigned int binding_index) = 0;
+  void
+  bind_components(std::pair<HydraulicComponent *, unsigned int> bind_point_1,
+                  std::pair<HydraulicComponent *, unsigned int> bind_point_2,
+                  std::shared_ptr<HydraulicLink> link);
 
 private:
-  std::unordered_set<std::shared_ptr<HydraulicComponent>>
-      components; /**< The Hydraulic Components in the Hydraulic Network.*/
+  std::unordered_map<unsigned int,
+                     std::pair<HydraulicComponent *, unsigned int>>
+      binding_points;
+  std::unordered_map<unsigned int, std::shared_ptr<HydraulicLink>>
+      binding_links; /**< The binding links of the component.*/
 };
 
 } // namespace hazen

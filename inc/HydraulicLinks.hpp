@@ -16,13 +16,16 @@ namespace hazen {
 /**
  * @brief The Passage Hydraulic Link will compute the head loss through a closed
  * conduit or an open channel.
- * @details The cross-sectional shape of the conduit or channel is constant and
- * must be a class derived from HydraulicShape class.
+ * @details The Passage must be prismatic, having constant cross-sectional area
+ * and slope. No local losses are computed, only the friction loss due to the
+ * passage walls.
  *
  */
 class PassageLink : public HydraulicLink {
 public:
-  PassageLink();
+  PassageLink(std::unique_ptr<HydraulicShape> cross_section_shape,
+              std::unique_ptr<FrictionMethod> friction_method, vec3 up_inv,
+              vec3 dn_inv, double ds);
   /**
    * @brief Calculate the head loss through a conduit or channel of the given
    * cross-sectional shape.
@@ -32,31 +35,24 @@ public:
    */
   double head_loss() override;
   /**
-   * @brief Set the cross sectional shape of the conduit or channel.
+   * @brief Get the upstream water surface of the passage if the passage is
+   * steep.
+   * @details The function will traverse the hydraulic network through steep
+   * upstream passages recursively until a control point can be established and
+   * compute frontwater calculations from that point to determine the upstream
+   * water surface elevation of the current passage.
    *
-   * @param shape The shape to use as the cross-section for the conduit or
-   * channel.
+   * @return double The upstream water surface elevation of this passage.
    */
-  void set_cross_section(std::shared_ptr<HydraulicShape> shape);
-  /**
-   * @brief Set the friction method of the Conduit used in the head loss
-   * calculation.
-   *
-   * @param friction_method The Friction Method to use.
-   */
-  void set_friction_method(std::shared_ptr<FrictionMethod> friction_method);
-  double get_up_node_velocity();
-  double get_dn_node_velocity();
-  double get_up_node_area();
-  double get_dn_node_area();
-  alignment invert_alignment; /**< The physical x,y,z coordinates of the
-                                 invert of the passage along the alignment in
-                                 space [UNITS = FT,FT,FT].*/
-  std::shared_ptr<HydraulicShape>
+  double get_upstream_water_surface();
+  std::unique_ptr<HydraulicShape>
       cross_section_shape; /**< The cross-sectional shape of the passage.*/
-  std::shared_ptr<FrictionMethod>
+  std::unique_ptr<FrictionMethod>
       friction_method; /**< The friction method used to calculate the head
                           loss through the passage.*/
+  vec3 up_inv;         /**< The upstream invert of the Passage.*/
+  vec3 dn_inv;         /**< The downstream invert of the Passage.*/
+  double ds;
 };
 
 /**
@@ -64,12 +60,13 @@ public:
  * Hydraulic Link due to turbulence and fluid-wall separation in fittings,
  * bends, and other junctions where there is no transition in the passage
  * dimensions.
+ * @details The Minor Link must be between exactally two Passage Links.
  * @details Downstream velocity is used in all cases.
  *
  */
 class MinorLink : public HydraulicLink {
 public:
-  MinorLink();
+  MinorLink(double K_pos, double K_neg);
   /**
    * @brief Calculate the head loss due to minor losses in the Hydraulic Link.
    *
@@ -78,13 +75,16 @@ public:
    * @see HydraulicComponent
    */
   double head_loss() override;
-  double K; /**< The minor loss coefficent */
-  PassageLink *downstream_passage;
+
+private:
+  double K_pos; /**< The minor loss coefficent for positive flow */
+  double K_neg; /**< The minor loss coefficent for negative flow */
 };
 
 /**
  * @brief The Transition Hydraulic Link will compute the head loss due to a
- * transition in passage dimensions.
+ * transition in passage dimensions using the Borda-Carnot equation.
+ * @details
  *
  * @details Both upstream and downstream velocities are considered in the
  * computation.
@@ -92,7 +92,7 @@ public:
  */
 class TransitionLink : public HydraulicLink {
 public:
-  TransitionLink();
+  TransitionLink(double K);
   /**
    * @brief Calculate the head loss due to the transition of the Hydraulic Link.
    *
@@ -101,9 +101,9 @@ public:
    * @see HydraulicComponent
    */
   double head_loss() override;
-  double K; /**< The local loss coefficent */
-  PassageLink *downstream_passage;
-  PassageLink *upstream_passage;
+
+private:
+  double K; /**< The empirical loss coefficent 0 <= K <= 1 */
 };
 
 /**
@@ -115,7 +115,8 @@ public:
  */
 class OpeningLink : public HydraulicLink {
 public:
-  OpeningLink();
+  OpeningLink(std::unique_ptr<HydraulicShape> cross_section_shape, double Cd,
+              double elevation, double dy, double percent_open = 1.0);
   /**
    * @brief Calculate the head loss through the opening of the given
    * cross-sectional shape.
@@ -124,116 +125,35 @@ public:
    * dowstream node to the upstream node.
    */
   virtual double head_loss() override;
-  /**
-   * @brief Set the cross sectional shape of the opening.
-   *
-   * @param shape The shape to use as the cross-section for the opening.
-   */
-  void set_cross_section(std::shared_ptr<HydraulicShape> shape);
-  double Cd;        /**< The empirical flow coefficent for the Weir.*/
-  double elevation; /**< The elevation of the lowest point on the weir crest
-                       [UNITS = FT].*/
 
 private:
-  std::shared_ptr<HydraulicShape>
+  std::unique_ptr<HydraulicShape>
       cross_section_shape; /**< The cross-sectional shape of the opening.*/
+  double Cd;               /**< The empirical flow coefficent for the Weir.*/
+  double elevation;    /**< The elevation of the lowest point on the weir crest
+                          [UNITS = FT].*/
+  double dy;           /**< The integration step along the cross section.*/
+  double percent_open; /**< The percent open if this is a gate. 0 to 1*/
 };
 
-// /**
-//  * @brief The Pump Hydraulic Link will compute the head loss through a Pump.
-//  * @details The head loss will be negative if the Pump imparts head to the
-//  * fluid.
-//  *
-//  */
-// class PumpLink : public HydraulicLink {
-// public:
-//   PumpLink();
-//   /**
-//    * @brief Calculate the head loss through the Pump.
-//    *
-//    * @return double The head loss though the Pump. This will be negative if
-//    * the Pump imparts head to the fluid.
-//    */
-//   double head_loss() override;
-//   std::vector<std::pair<double, double>>
-//       flow_head_curve; /**< The Pump's flow-head curve. first() is flow in
-//                           CFS, second() is head in FT.*/
-//   double elevation;    /**< The elevation of the pump discharge.*/
-// };
-//
-// /**
-//  * @brief The Slide Gate Hydraulic Link will compute the head loss through a
-//  * Slide Gate. If fully closed, this Hydraulic Link is disabled from the
-//  * Hydraulic Network.
-//  * @details The Slide Gate can have any cross-sectional shape derived from
-//  the
-//  * Hydraulic Shape class. The Slide Gate can be fully closed, fully open, or
-//  * open by a percentage.
-//  *
-//  */
-// class SlideGateLink : public OpeningLink {
-// public:
-//   SlideGateLink();
-//   /**
-//    * @brief Calculate the head loss though the Slide Gate.
-//    *
-//    * @return double The head loss though the Slide Gate from the downstream
-//    * Hydraulic Node to the upstream Hydraulic Node. NaN is returned if the
-//    * Slide Gate is fully closed.
-//    */
-//   double head_loss() override;
-//   double elevation;    /**< The elevation of the gate invert.*/
-//   double percent_open; /**< The percentage that the Slide Gate is open. Can
-//                           range from 0 to 1.*/
-//   bool is_closed; /**< True if the Slide Gate is fully closed and percent
-//   open
-//                      is less than or equal to zero.*/
-// };
-//
-// /**
-//  * @brief The Stop Valve Hydraulic Link will compute the head loss through a
-//  * Stop Valve. If closed, this Hydraulic Link is disabled from the Hydraulic
-//  * Network.
-//  *
-//  */
-// class StopValveLink : public LocalLink {
-// public:
-//   StopValveLink();
-//   /**
-//    * @brief Calculate the head loss though the Stop Valve Link.
-//    *
-//    * @return double The head loss through the Stop Valve. NaN is returned
-//    * if the Stop Valve is closed.
-//    */
-//   double head_loss() override;
-//   double elevation; /**< The elevation of the stop valve invert.*/
-//   bool is_closed;   /**< True is the Stop Valve is closed.*/
-// };
-//
-// /**
-//  * @brief The Check Valve Hydraulic Link will compute the head loss though a
-//  * Check Valve. Flow can only move from upstream to downstream on this
-//  * Hydraulic Link.
-//  *
-//  */
-// class CheckValveLink : public LocalLink {
-// public:
-//   CheckValveLink();
-//   /**
-//    * @brief Compute the head loss through th Check Valve.
-//    *
-//    * @return double The head loss though the Check Valve. NaN is returned if
-//    * the flow through the Check Valve is negative.
-//    */
-//   double head_loss() override;
-//   double elevation; /**< The elevation of the check valve invert.*/
-// };
+class ManholeLink : public HydraulicLink {
+public:
+  ManholeLink(double elevation, BENCH_CONFIGURATION bench_config);
+  virtual double head_loss() override;
 
-// Additional Hydraulic Links not yet implemented:
-// 1. Flume Link
-// 2. Granular Filter Link
-// 3. BarRack/Screen Link
-// 4. Diffuser Link
+private:
+  double elevation;
+  BENCH_CONFIGURATION bench_config;
+};
+
+/**
+ * @brief A Null Link that always reports zero for it's head loss.
+ *
+ */
+class NullLink : public HydraulicLink {
+public:
+  virtual double head_loss() override;
+};
 
 } // namespace hazen
 

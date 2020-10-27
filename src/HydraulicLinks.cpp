@@ -1,142 +1,243 @@
 #include "HydraulicLinks.hpp"
 #include "HeadLoss.hpp"
-#include <cmath>
+#include <algorithm>
 
 namespace hazen {
 
-MinorLink::MinorLink() : K(nan("")), downstream_passage(nullptr) {}
-double MinorLink::head_loss() {
-  if (downstream_passage) {
-    double V = downstream_passage->get_up_node_velocity();
-    return K * V * V / (2 * g);
+// Hydraulic Links -------------------------------------------------------------
+double HydraulicLink::get_downstream_water_surface() {
+  double h = -std::numeric_limits<double>::infinity();
+  HydraulicNode *node = Q >= 0.0 ? dn_node : up_node;
+  for (auto link : node->links) {
+    if ((link->up_node == node && link->Q >= 0.0) ||
+        (link->dn_node == node && link->Q < 0.0)) {
+      h = std::max(link->HGL[link->HGL.size() - 1].second, h);
+    }
+  }
+  return h == -std::numeric_limits<double>::infinity() ? node->H : h;
+}
+double HydraulicLink::get_downstream_velocity() {
+  HydraulicNode *node = Q >= 0.0 ? up_node : dn_node;
+  for (auto &link : node->links) {
+    if (auto passage = dynamic_cast<PassageLink *>(link)) {
+      double d;
+      if (passage->Q >= 0.0) {
+        d = passage->HGL[passage->HGL.size() - 1].second - passage->up_inv.z;
+      } else {
+        d = passage->HGL[passage->HGL.size() - 1].second - passage->dn_inv.z;
+      }
+      return abs(Q) / passage->cross_section_shape->flow_area(d);
+    }
   }
   return 0.0;
 }
-TransitionLink::TransitionLink()
-    : K(nan("")), downstream_passage(nullptr), upstream_passage(nullptr) {}
-double TransitionLink::head_loss() {
-  if (downstream_passage && upstream_passage) {
-    double V_dn = downstream_passage->get_up_node_velocity();
-    double V_up = upstream_passage->get_dn_node_velocity();
-    if (V_dn < V_up) {
-      // expansion loss assumed
-      std::function<double(double)> F = [=](double h_up) -> double {
-        up_node->H = h_up;
-        double V = upstream_passage->get_dn_node_velocity();
-        return up_node->H - dn_node->H + (V * V - V_dn * V_dn) / (2.0 * g) -
-               K * (V * V_dn) * (V * V_dn) / (2.0 * g);
-      };
-      up_node->H =
-          find_goal_secant(0.0, dn_node->H, dn_node->H + 0.1, 0.00001, F);
-      V_dn = downstream_passage->get_up_node_velocity();
-      V_up = upstream_passage->get_dn_node_velocity();
-      double dh = up_node->H - dn_node->H;
-      return dh + (V_up * V_up - V_dn * V_dn) / (2.0 * g);
-    } else if (V_dn > V_up) {
-      // contraction loss assumed
-      std::function<double(double)> F = [=](double h_up) -> double {
-        up_node->H = h_up;
-        double V = upstream_passage->get_dn_node_velocity();
-        double A_dn = downstream_passage->get_up_node_area();
-        double A_up = upstream_passage->get_dn_node_area();
-        double mu = 0.63 + 0.37 * pow(A_dn / A_up, 3.0);
-        return up_node->H - dn_node->H + (V * V - V_dn * V_dn) / (2.0 * g) -
-               K * (1.0 / 2.0 / g) * pow(1.0 / mu - 1.0, 2.0) *
-                   pow(A_up / A_dn, 2.0) * V_up * V_up;
-      };
-      up_node->H =
-          find_goal_secant(0.0, dn_node->H, dn_node->H + 0.1, 0.00001, F);
-      V_dn = downstream_passage->get_up_node_velocity();
-      V_up = upstream_passage->get_dn_node_velocity();
-      double dh = up_node->H - dn_node->H;
-      return dh + (V_up * V_up - V_dn * V_dn) / (2.0 * g);
-    }
-    return 0.0;
-  }
-  return 0.0;
-}
-PassageLink::PassageLink()
-    : cross_section_shape(nullptr), friction_method(nullptr) {}
-void PassageLink::set_cross_section(std::shared_ptr<HydraulicShape> shape) {
-  cross_section_shape = shape;
-}
-void PassageLink::set_friction_method(
-    std::shared_ptr<FrictionMethod> friction_method) {
-  this->friction_method = friction_method;
-}
-double PassageLink::get_up_node_velocity() { return Q / get_up_node_area(); }
-double PassageLink::get_dn_node_velocity() { return Q / get_dn_node_area(); }
-double PassageLink::get_up_node_area() {
-  if (up_node) {
-    // most upstream point of passage
-    vec3 p1 = invert_alignment[invert_alignment.size() - 1];
-    // second most upstream point of passage
-    vec3 p2 = invert_alignment[invert_alignment.size() - 2];
-    // vertical depth to invert at upstream end of passage
-    double y = up_node->H - p1.z;
-    // Slope of upstream end of passage
-    double S = slope(p2, p1);
-    // flow depth in passage
-    double d;
-    if (S == std::numeric_limits<double>::infinity() ||
-        S == -std::numeric_limits<double>::infinity()) {
-      d = cross_section_shape->get_max_depth();
-    } else {
-      d = y / sqrt(S * S + 1);
-    }
-    // velocity at upstream end of passage
-    return cross_section_shape->flow_area(d);
-  }
-  return nan("");
-}
-double PassageLink::get_dn_node_area() {
-  if (dn_node) {
-    // second most downstream point of passage
-    vec3 p1 = invert_alignment[1];
-    // most downstream point of passage
-    vec3 p2 = invert_alignment[0];
-    // vertical depth to invert at downstream end of passage
-    double y = up_node->H - p1.z;
-    // Slope of udownstreampstream end of passage
-    double S = slope(p2, p1);
-    // flow depth in passage
-    double d;
-    if (S == std::numeric_limits<double>::infinity() ||
-        S == -std::numeric_limits<double>::infinity()) {
-      d = cross_section_shape->get_max_depth();
-    } else {
-      d = y / sqrt(S * S + 1);
-    }
-    // velocity at downstream end of passage
-    return cross_section_shape->flow_area(d);
-  }
-  return nan("");
-}
+
+// Conduits and Channels -------------------------------------------------------
+PassageLink::PassageLink(std::unique_ptr<HydraulicShape> cross_section_shape,
+                         std::unique_ptr<FrictionMethod> friction_method,
+                         vec3 up_inv, vec3 dn_inv, double ds)
+    : cross_section_shape(std::move(cross_section_shape)),
+      friction_method(std::move(friction_method)), up_inv(up_inv),
+      dn_inv(dn_inv), ds(ds) {}
 double PassageLink::head_loss() {
-  double jump_x = nan("");
-  double h_new = dn_node->H;
-  for (int i = 0; i < invert_alignment.size() - 1; i++) {
-    vec3 dn_inv = invert_alignment[i];
-    vec3 up_inv = invert_alignment[i + 1];
-    double loss =
-        gvf_backwater_loss(cross_section_shape.get(), friction_method.get(),
-                           up_inv, dn_inv, Q, h_new, 0.001, jump_x);
-    h_new += loss;
-    if (!isnan(jump_x)) {
-      double S = slope(dn_inv, up_inv);
-      double a = sqrt(S * S + 1);
-      h_new = up_inv.z + a * critical_depth(cross_section_shape.get(), Q);
+  double h = get_downstream_water_surface();
+  // if pipe is vertical, use vertical shaft loss.
+  if (horizontal_length(dn_inv, up_inv) == 0.0) {
+    if (Q >= 0.0) {
+      return vertical_shaft_loss(cross_section_shape.get(),
+                                 friction_method.get(), up_inv.z, dn_inv.z, Q,
+                                 h, HGL);
+    } else if (Q < 0.0) {
+      return vertical_shaft_loss(cross_section_shape.get(),
+                                 friction_method.get(), dn_inv.z, up_inv.z, -Q,
+                                 h, HGL);
     }
   }
-  return h_new - dn_node->H;
+  double H1 = 0.0;
+  double jump_x = nan("");
+  std::vector<std::pair<double, double>> passage_backwater_HGL{};
+  std::vector<std::pair<double, double>> passage_frontwater_HGL{};
+  if (Q >= 0.0) {
+    H1 = gvf_backwater_loss(cross_section_shape.get(), friction_method.get(),
+                            up_inv, dn_inv, Q, h, ds, jump_x,
+                            passage_backwater_HGL);
+    if (!isnan(jump_x)) {
+      h = get_upstream_water_surface();
+      H1 = gvf_frontwater_loss(cross_section_shape.get(), friction_method.get(),
+                               up_inv, dn_inv, Q, h, ds, jump_x,
+                               passage_frontwater_HGL);
+    }
+  } else if (Q < 0.0) {
+    H1 = gvf_backwater_loss(cross_section_shape.get(), friction_method.get(),
+                            dn_inv, up_inv, -Q, h, ds, jump_x,
+                            passage_backwater_HGL);
+    if (!isnan(jump_x)) {
+      h = get_upstream_water_surface();
+      H1 = gvf_frontwater_loss(cross_section_shape.get(), friction_method.get(),
+                               dn_inv, up_inv, -Q, h, ds, jump_x,
+                               passage_frontwater_HGL);
+    }
+  }
+  std::reverse(passage_frontwater_HGL.begin(), passage_frontwater_HGL.end());
+  passage_backwater_HGL.insert(passage_backwater_HGL.end(),
+                               passage_frontwater_HGL.begin(),
+                               passage_frontwater_HGL.end());
+  HGL = passage_backwater_HGL;
+  return H1;
 }
-OpeningLink::OpeningLink()
-    : Cd(nan("")), elevation(nan("")), cross_section_shape(nullptr) {}
+double PassageLink::get_upstream_water_surface() {
+  std::vector<double> elevations{};
+  HydraulicNode *node = Q >= 0.0 ? up_node : dn_node;
+  for (auto link : node->links) {
+    if (auto passage = dynamic_cast<PassageLink *>(link)) {
+      // regular flow from passage
+      if (passage->dn_node == node && passage->Q >= 0.0) {
+        double S = slope(passage->dn_inv, passage->up_inv);
+        double dn = normal_depth(passage->cross_section_shape.get(),
+                                 passage->friction_method.get(), S, passage->Q);
+        double dc =
+            critical_depth(passage->cross_section_shape.get(), passage->Q);
+        bool is_steep = dn < dc ? true : false;
+        if (is_steep) {
+          double h = passage->get_upstream_water_surface();
+          std::vector<std::pair<double, double>> passage_hgl{};
+          h = gvf_frontwater_loss(passage->cross_section_shape.get(),
+                                  passage->friction_method.get(),
+                                  passage->up_inv, passage->dn_inv, passage->Q,
+                                  h, ds, 0.0, passage_hgl);
+          elevations.push_back(passage_hgl[passage_hgl.size() - 1].second);
+        }
+      }
+      // reverse flow from passage
+      if (passage->up_node == node && passage->Q < 0.0) {
+        double S = slope(passage->up_inv, passage->dn_inv);
+        double dn =
+            normal_depth(passage->cross_section_shape.get(),
+                         passage->friction_method.get(), S, -passage->Q);
+        double dc =
+            critical_depth(passage->cross_section_shape.get(), -passage->Q);
+        bool is_steep = dn < dc ? true : false;
+        if (is_steep) {
+          double h = passage->get_upstream_water_surface();
+          std::vector<std::pair<double, double>> passage_hgl{};
+          h = gvf_frontwater_loss(passage->cross_section_shape.get(),
+                                  passage->friction_method.get(),
+                                  passage->dn_inv, passage->up_inv, -passage->Q,
+                                  h, ds, 0.0, passage_hgl);
+          elevations.push_back(passage_hgl[passage_hgl.size() - 1].second);
+        }
+      }
+    }
+  }
+  if (elevations.size()) {
+    return *std::max_element(elevations.begin(), elevations.end());
+  }
+  double dc = critical_depth(cross_section_shape.get(), abs(Q));
+  return Q <= 0.0 ? dn_inv.z + dc : up_inv.z + dc;
+}
+
+// Orifices and Weirs ----------------------------------------------------------
+OpeningLink::OpeningLink(std::unique_ptr<HydraulicShape> cross_section_shape,
+                         double Cd, double elevation, double dy,
+                         double percent_open)
+    : cross_section_shape(std::move(cross_section_shape)), Cd(Cd),
+      elevation(elevation), dy(dy), percent_open(percent_open) {}
 double OpeningLink::head_loss() {
-  return opening_loss(cross_section_shape.get(), Cd, elevation, Q, dn_node->H,
-                      0.0001);
+  double h = get_downstream_water_surface();
+  return opening_loss(cross_section_shape.get(), Cd, elevation, abs(Q), h, dy,
+                      HGL, percent_open);
 }
-void OpeningLink::set_cross_section(std::shared_ptr<HydraulicShape> shape) {
-  cross_section_shape = shape;
+
+// Minor Loss ------------------------------------------------------------------
+MinorLink::MinorLink(double K_pos, double K_neg) : K_pos(K_pos), K_neg(K_neg) {}
+double MinorLink::head_loss() {
+  double V = get_downstream_velocity();
+  double h = get_downstream_water_surface();
+  double hv = V * V / (2.0 * g);
+  double H1 = Q >= 0.0 ? K_pos * hv : K_neg * hv;
+  HGL.clear();
+  HGL.push_back({0.0, h + hv});
+  HGL.push_back({0.0, H1});
+  return H1;
 }
+
+// Expansion and Contraction ---------------------------------------------------
+TransitionLink::TransitionLink(double K) : K(K) {}
+double TransitionLink::head_loss() {
+  HydraulicShape *up_shape = nullptr, *dn_shape = nullptr;
+  double up_inv = -std::numeric_limits<double>::infinity(),
+         dn_inv = -std::numeric_limits<double>::infinity();
+  if (Q >= 0.0) {
+    for (auto &link : up_node->links) {
+      if (auto passage = dynamic_cast<PassageLink *>(link)) {
+        if (passage->Q >= 0.0) {
+          up_inv = passage->dn_inv.z;
+        } else {
+          up_inv = passage->up_inv.z;
+        }
+        up_shape = passage->cross_section_shape.get();
+      }
+    }
+    for (auto &link : dn_node->links) {
+      if (auto passage = dynamic_cast<PassageLink *>(link)) {
+        if (passage->Q >= 0.0) {
+          dn_inv = passage->up_inv.z;
+        } else {
+          dn_inv = passage->dn_inv.z;
+        }
+        dn_shape = passage->cross_section_shape.get();
+      }
+    }
+  } else {
+    for (auto &link : up_node->links) {
+      if (auto passage = dynamic_cast<PassageLink *>(link)) {
+        if (passage->Q >= 0.0) {
+          dn_inv = passage->dn_inv.z;
+        } else {
+          dn_inv = passage->up_inv.z;
+        }
+        dn_shape = passage->cross_section_shape.get();
+      }
+    }
+    for (auto &link : dn_node->links) {
+      if (auto passage = dynamic_cast<PassageLink *>(link)) {
+        if (passage->Q >= 0.0) {
+          up_inv = passage->up_inv.z;
+        } else {
+          up_inv = passage->dn_inv.z;
+        }
+        up_shape = passage->cross_section_shape.get();
+      }
+    }
+  }
+  // if no passage, assume infinite reservoir.
+  Rectangle inf_reservoir =
+      Rectangle(std::numeric_limits<double>::infinity(),
+                std::numeric_limits<double>::infinity(), true);
+  if (up_shape == nullptr) {
+    up_shape = &inf_reservoir;
+  }
+  if (dn_shape == nullptr) {
+    dn_shape = &inf_reservoir;
+  }
+  double h = get_downstream_water_surface();
+  double H1 =
+      transition_loss(up_shape, dn_shape, up_inv, dn_inv, abs(Q), K, h, HGL);
+  return H1;
+}
+
+// Manhole losses --------------------------------------------------------------
+ManholeLink::ManholeLink(double elevation, BENCH_CONFIGURATION bench_config)
+    : elevation(elevation), bench_config(bench_config) {}
+double ManholeLink::head_loss() {
+  // find flow direction of all connecting pipes and bind them to the correct
+  // nodes
+
+  // find the parameters for the head loss equations
+
+  // clac new H upstream.
+}
+
+double NullLink::head_loss() { return 0.0; }
+
 } // namespace hazen

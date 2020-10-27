@@ -4,10 +4,12 @@
 #include "HydraulicShapes.hpp"
 #include <functional>
 #include <limits>
+#include <string>
+#include <utility> // std::pair
 #include <vector>
 
 namespace hazen {
-// Constants -----------------------------
+// Physical Constants ----------------------------------------------------------
 const double g = 32.17405;               // acceleration due to gravity [FT/S^2]
 const double rho_water_32 = 62.416 / g;  // density of water at 32F
 const double rho_water_40 = 62.432 / g;  // density of water at 40F
@@ -25,7 +27,6 @@ const double mu_water_70 = 2.034e-5;     // dynamic viscosity of water at 70F.
 const double mu_water_80 = 1.791e-5;     // dynamic viscosity of water at 80F.
 const double mu_water_90 = 1.500e-5;     // dynamic viscosity of water at 90F.
 const double mu_water_100 = 1.423e-5;    // dynamic viscosity of water at 100F.
-// ---------------------------------------
 
 /**
  * @brief A simple 3 component structure used for storing vertex information.
@@ -35,10 +36,7 @@ struct vec3 {
   double x, y, z;
 };
 
-// An n-sized vector of vertices describing an alignment of a passage.
-using alignment = std::vector<vec3>;
-
-// Dimensionless numbers -----------------
+// Dimensionless numbers -------------------------------------------------------
 /**
  * @brief Compute the Reynolds number for the flow.
  *
@@ -59,10 +57,10 @@ double reynolds(double rho, double mu, double V, double Dh);
  * @return double The Froude number of the flow.
  */
 double froude(double V, double h);
-// ---------------------------------------
 
 /**
- * @brief Compute the darcy friction factor used in the Darcy-Weisbach Equation.
+ * @brief Compute the darcy friction factor used in the Darcy-Weisbach Equation
+ * for pressure driven flow.
  * @details Valid approximation for all flow regimes. See Bellos, Nalbantis,
  * Tsakiris (2018).
  *
@@ -71,8 +69,31 @@ double froude(double V, double h);
  * @param eps Passage roughness [UNITS = FT].
  * @return double The darcy friction factor for the passage.
  */
-double darcy_friction_factor(double Re, double Dh, double eps);
+double darcy_friction_factor_pressure_driven(double Re, double Dh, double eps);
 
+/**
+ * @brief Compute the darcy friction factor used in the Darcy-Weisbach Equation
+ * for free surface flow.
+ * @details Valid approximation for all flow regimes. See Bellos, Nalbantis,
+ * Tsakiris (2018).
+ *
+ * @param Re Reynolds Number of the flow
+ * @param Dh Hydraulic Diameter of the passage [UNITS = FT].
+ * @param eps Passage roughness [UNITS = FT].
+ * @return double The darcy friction factor for the passage.
+ */
+double darcy_friction_factor_free_surface(double Re, double Dh, double eps);
+
+// Lambert W Function
+/**
+ * @brief An approximation of the Lambert W function
+ *
+ * @param x the input
+ * @return double the output
+ */
+double lambert_W(double x);
+
+// Characteristic Lengths ------------------------------------------------------
 /**
  * @brief Calculate the normal depth (uniform flow depth) at the current flow
  * for the conduit or channel.
@@ -120,8 +141,6 @@ double critical_depth(HydraulicShape *shape, double Q);
 double brink_depth(HydraulicShape *shape, FrictionMethod *friction, double S,
                    double Q);
 
-double clamp(double value, double min, double max);
-
 /**
  * @brief Compute the actual length between two points
  *
@@ -151,22 +170,7 @@ double horizontal_length(vec3 down, vec3 up);
  */
 double slope(vec3 down, vec3 up);
 
-/**
- * @brief Compute the length along a 3-dimensional alignment.
- *
- * @param align The alignment.
- * @return double The true length of the alignment [UNITS = FT].
- */
-double alignment_length(alignment &align);
-
-/**
- * @brief Compute the horizontal length of an alignment.
- *
- * @param align The alignment.
- * @return double The horizontal length of the alignment [UNITS = FT].
- */
-double alignment_horizontal_length(alignment &align);
-
+// Root Finding Methods --------------------------------------------------------
 /**
  * @brief Find the goal of an objective function using the Secant root
  * finding method.
@@ -175,7 +179,7 @@ double alignment_horizontal_length(alignment &align);
  * @param x0 The first initial starting point for the objective function. Should
  * ideally be chosen to lie close to the goal.
  * @param x1 The second initial starting point for the objective function.
- * Should ideally be chosento lie close to the goal.
+ * Should ideally be chosen to lie close to the goal.
  * @param TOL The tolerance of the convergence for the solution.
  * @param objective The objective function.
  * @param MAX_ITER The maximum iterations to perform before the function quits
@@ -186,7 +190,7 @@ double alignment_horizontal_length(alignment &align);
  */
 double find_goal_secant(double goal, double x0, double x1, double TOL,
                         std::function<double(double)> objective,
-                        const int MAX_ITER = 100);
+                        const int MAX_ITER = 1000);
 
 /**
  * @brief Find the goal of an objective function using the Bisection root
@@ -209,8 +213,68 @@ double find_goal_secant(double goal, double x0, double x1, double TOL,
  */
 double find_goal_bisection(double goal, double a, double b, double TOL,
                            std::function<double(double)> objective,
-                           const int MAX_ITER = 100);
+                           const int MAX_ITER = 1000);
 
+/**
+ * @brief Find the goal of an objective function using the Inverse Quadratic
+ * root finding method.
+ *
+ * @param goal The goal of the objective function.
+ * @param x0 The first initial starting point for the objective function. Should
+ * ideally be chosen to lie close to the goal.
+ * @param x1 The second initial starting point for the objective function.
+ * Should ideally be chosen to lie close to the goal.
+ * @param x2 The third initial starting point for the objective function.
+ * Should ideally be chosen to lie close to the goal.
+ * @param TOL The tolerance of the convergence for the solution.
+ * @param objective The objective function.
+ * @param MAX_ITER The maximum iterations to perform before the function quits
+ * trying to refine the estimate.
+ * @return double The input to the objective function that results in an
+ * approximate value of goal being returned. NaN is returned if the goal cannot
+ * be found or if the maximum iterations is exceeded.
+ */
+double find_goal_inverse_quadratic(double goal, double x0, double x1, double x2,
+                                   double TOL,
+                                   std::function<double(double)> objective,
+                                   const int MAX_ITER = 1000);
+
+/**
+ * @brief Solve for the root of a function f(x): R^n -> R
+ *
+ * @param x0 The first initial guess for the solution. Must be of length n.
+ * @param TOL The convergence tolerance for the solver.
+ * @param objective The objective function f(x): R^n -> R.
+ * @param MAX_ITER The maximum iterations to perform before the function quits
+ * trying to refine the estimate.
+ * @return std::vector<double> The solution that gives the root of the objective
+ * function.
+ */
+std::vector<double> unconstrained_solver_secant(
+    std::vector<double> x0, double TOL,
+    std::function<double(std::vector<double>)> objective,
+    const int MAX_ITER = 1000);
+
+/**
+ * @brief Solve for the root of a function f(x): R^n -> R with equality
+ * constraints g(x): R^n -> R^c with g(x) = 0.
+ *
+ * @param x0 The first initial guess for the solution. Must be of length n.
+ * @param TOL The convergence tolerance for the solver.
+ * @param objective The objective function f(x): R^n -> R.
+ * @param constraints The constraint function g(x): R^n -> R^c.
+ * @param MAX_ITER The maximum iterations to perform before the function quits
+ * trying to refine the estimate.
+ * @return std::vector<double> The solution that gives the root of the objective
+ * function subject to the given constraints.
+ */
+std::vector<double> constrained_solver_secant(
+    std::vector<double> x0, double TOL,
+    std::function<double(std::vector<double>)> objective,
+    std::function<std::vector<double>(std::vector<double>)> constraints,
+    const int MAX_ITER = 1000);
+
+// Numerical Integration -------------------------------------------------------
 /**
  * @brief Compute a single step of the Fourth-order Runge-Kutta numerical
  * integration method.
@@ -226,13 +290,43 @@ double RK4(std::function<double(double, double)> F, double yi, double xi,
            double dx);
 
 /**
+ * @brief Copmute the integral of a function using a user specified numerical
+ * integration method.
+ *
+ * @param integration_method The integration method to use
+ * @param F The function F(xi,yi) = dy/dx
+ * @param y_init The initial value of y used to calculate the next value yi+1.
+ * @param x_lower The lower bounds of integration for the integral.
+ * @param x_upper The upper bounds of integration for the integral.
+ * @param dx The integration step for the numerical integration method.
+ * @return double The approximate integral of the function.
+ */
+double integrate(std::function<double(std::function<double(double, double)>,
+                                      double, double, double)>
+                     integration_method,
+                 std::function<double(double, double)> F, double y_init,
+                 double x_lower, double x_upper, double dx);
+
+/**
  * @brief Linearly interpolate a function of a single variable given as a vector
  * of x,y pairs.
  *
+ * @param data The data to interpolate, vector of (x,y) pairs.
  * @param x The x value to interpolate
  * @return double The interpolated y value at x
  */
-double interp_1D(std::vector<std::pair<double, double>> &func, double x);
+double interp_1D(std::vector<std::pair<double, double>> &data, double x);
+
+/**
+ * @brief Write a CSV file with double type data in columns and string type data
+ * in headers.
+ *
+ * @param filename The output filepath
+ * @param dataset The data to write
+ */
+void write_csv(
+    std::string filename,
+    std::vector<std::pair<std::string, std::vector<double>>> dataset);
 
 } // namespace hazen
 #endif
