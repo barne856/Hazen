@@ -1,94 +1,62 @@
 #ifndef HYDRAULICCOMPONENTS
 #define HYDRAULICCOMPONENTS
 
-#include "HeadLoss.hpp"
 #include "HydraulicLinks.hpp"
-#include "HydraulicNetwork.hpp"
+#include "HydraulicUtil.hpp"
 
 namespace hazen {
 /**
- * @brief An Outfall Component in a Hydraulic Network
- * 
+ * @brief A Node Component in a Hydraulic Network.
+ *
+ */
+class Node : public HydraulicComponent {
+public:
+  Node();
+  void add_flow(double Q);
+  enum binding_point { NODE = 0 };
+};
+
+/**
+ * @brief An Outfall Component in a Hydraulic Network.
+ *
  */
 class Outfall : public HydraulicComponent {
 public:
-  Outfall();
-  virtual void bind(std::pair<HydraulicComponent *, unsigned int> bind_point,
-                    unsigned int binding_index);
-
-protected:
-  virtual HydraulicNode *get_binding_node(unsigned int binding_index);
-
-private:
-  std::shared_ptr<HydraulicNode> outfall_node;
+  Outfall(double H);
+  double H;
+  enum binding_point { NODE = 0 };
 };
 
 /**
- * @brief Manhole Component in a Hydraulic Network
+ * @brief An Opening Component in a Hydraulic Network.
  *
  */
-class Manhole : public HydraulicComponent {
+class Opening : public HydraulicComponent {
 public:
-  Manhole(double invert, BENCH_CONFIGURATION bench_config);
-  virtual void bind(std::pair<HydraulicComponent *, unsigned int> bind_point,
-                    unsigned int binding_index);
-
-protected:
-  virtual HydraulicNode *get_binding_node(unsigned int binding_index);
-
-private:
-  double invert;
-  BENCH_CONFIGURATION bench_config;
-  std::shared_ptr<ManholeLink> manhole_link;
-  std::shared_ptr<HydraulicNode> up_node;
-  std::shared_ptr<HydraulicNode> dn_node;
+  Opening(std::shared_ptr<HydraulicShape> opening_shape, double Cd,
+          double invert);
+  enum binding_point { NODE1 = 0, NODE2 };
 };
 
+/**
+ * @brief A Passage Component in a Hydraulic Network.
+ *
+ */
 class Passage : public HydraulicComponent {
 public:
-  Passage();
-  virtual void bind(std::pair<HydraulicComponent *, unsigned int> bind_point,
-                    unsigned int binding_index);
-
-protected:
-  virtual HydraulicNode *get_binding_node(unsigned int binding_index);
-
-private:
+  Passage(std::shared_ptr<HydraulicShape> cross_section_shape,
+          std::shared_ptr<FrictionMethod> friction_method,
+          std::vector<vec3> alignment);
+  enum binding_point { NODE1 = 0, NODE2 };
 };
-
-/**
- * @brief Storage Component in a Hydraulic Netowork
- * @details When a Passage Link connects to this component, a transition link is
- * placed between the passage and the interior node with loss coefficient 1.
- * Otherwise, a Null Link is used to connect the components.
- *
- */
-class Storage : public HydraulicComponent {
-public:
-  Storage(std::vector<std::pair<double, double>> storage_curve,
-          double elevation);
-  virtual void bind(std::pair<HydraulicComponent *, unsigned int> bind_point,
-                    unsigned int binding_index);
-
-protected:
-  virtual HydraulicNode *get_binding_node(unsigned int binding_index);
-
-private:
-  std::vector<std::pair<double, double>>
-      storage_curve; /**< The storage curve for this type of storage, a vector
-                        of pairs (depth, surface area)*/
-  double elevation;  /**< The elevation of the bottom of the storage area.*/
-  std::shared_ptr<HydraulicNode> storage_node;
-};
-
-// Opening
-
 
 } // namespace hazen
 
 #endif
 
 // Not yet implemented
+// Manhole
+// Storage
 // Pump
 // in-line minor loss (Reducers/meters/Bends/etc.)
 // Three-way minor loss (Tee/Wye)

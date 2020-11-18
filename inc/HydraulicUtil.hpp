@@ -1,6 +1,7 @@
 #ifndef HYDRAULICUTIL
 #define HYDRAULICUTIL
 #include "FrictionMethods.hpp"
+#include "HeadLoss.hpp"
 #include "HydraulicShapes.hpp"
 #include <functional>
 #include <limits>
@@ -274,7 +275,34 @@ std::vector<double> constrained_solver_secant(
     std::function<std::vector<double>(std::vector<double>)> constraints,
     const int MAX_ITER = 1000);
 
-// Numerical Integration -------------------------------------------------------
+/**
+ * @brief Solve for the root of a multivariate function F(x): R^n -> R^n
+ *
+ * @param x0 The initial guess for the root.
+ * @param TOL The tolerance of convergence
+ * @param objective The objective function for which to find the root.
+ * @param MAX_ITER The maximum iterations before the function returns without
+ * finding a root.
+ * @return std::vector<double> The root of the objective function if it was
+ * found.
+ */
+std::vector<double> secant_root_multivariate(
+    std::vector<double> x0, double TOL,
+    std::function<std::vector<double>(std::vector<double>)> objective,
+    const int MAX_ITER = 1000);
+
+std::vector<double> solve_least_squares_linear_system(
+    std::vector<double> x0, double TOL,
+    std::function<std::vector<double>(std::vector<double>)> objective);
+
+std::vector<double> solve_constrained_problem_lagrange(
+    std::vector<double> x0,
+    std::function<double(std::vector<double>)> objective,
+    std::function<std::vector<double>(std::vector<double>)> constraints,
+    double TOL, const int MAX_ITER);
+
+// Numerical Integration
+// -------------------------------------------------------
 /**
  * @brief Compute a single step of the Fourth-order Runge-Kutta numerical
  * integration method.
@@ -288,6 +316,23 @@ std::vector<double> constrained_solver_secant(
  */
 double RK4(std::function<double(double, double)> F, double yi, double xi,
            double dx);
+
+/**
+ * @brief Compute the solution of an ODE using a Runge-Kutta (4,5) embedded
+ * algorithm with an adaptive step size.
+ *
+ * @param ode The ODE to solve dy/dx(x,y).
+ * @param init The initial value y0.
+ * @param span The span [x0, xf] to solve for.
+ * @param rel_tol The relative error tolerance criterion used to compute the
+ * adaptive step size.
+ * @return std::vector<double> The result y(x) on the span [x0, xf].
+ */
+std::vector<std::pair<double, double>>
+RKF45(std::function<double(double, double)> ode, double init,
+      std::pair<double, double> span,
+      std::function<bool(double, double)> condition = nullptr,
+      double rel_tol = 1e-5, int MAX_STEP = 1000, double h_min = 1e-5);
 
 /**
  * @brief Copmute the integral of a function using a user specified numerical
@@ -316,6 +361,20 @@ double integrate(std::function<double(std::function<double(double, double)>,
  * @return double The interpolated y value at x
  */
 double interp_1D(std::vector<std::pair<double, double>> &data, double x);
+
+/**
+ * @brief Generate a table for exporting to a csv file from a vector of pairs of
+ * doubles.
+ *
+ * @param values A vector of pairs of doubles.
+ * @param label1 The label for the first entry in the pairs.
+ * @param label2 The label for the second entry in the pairs.
+ * @return std::vector<std::pair<std::string, std::vector<double>>> The table
+ * for writing to a csv file.
+ */
+std::vector<std::pair<std::string, std::vector<double>>>
+gen_table(std::vector<std::pair<double, double>> values, std::string label1,
+          std::string label2);
 
 /**
  * @brief Write a CSV file with double type data in columns and string type data

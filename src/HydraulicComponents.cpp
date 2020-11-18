@@ -1,43 +1,62 @@
 #include "HydraulicComponents.hpp"
+#include <utility>
 
 namespace hazen {
+// Node ------------------------------------------------------------------------
+Node::Node() { nodes.push_back(std::make_shared<HydraulicNode>()); }
+void Node::add_flow(double Q) { nodes[0]->point_flows.push_back(Q); }
+
 // Outfall ---------------------------------------------------------------------
-Outfall::Outfall() : outfall_node(std::make_shared<HydraulicNode>()) {}
-void Outfall::bind(std::pair<HydraulicComponent *, unsigned int> bind_point,
-                   unsigned int binding_index) {
-  std::shared_ptr<HydraulicLink> link;
-  if (dynamic_cast<Passage *>(bind_point.first)) {
-    link = std::make_shared<TransitionLink>(1.0);
-  } else {
-    link = std::make_shared<NullLink>();
-  }
-  bind_components({this, binding_index}, bind_point, link);
-}
-HydraulicNode *Outfall::get_binding_node(unsigned int binding_index) {
-  return outfall_node.get();
+Outfall::Outfall(double H) : H(H) {
+  nodes.push_back(std::make_shared<HydraulicNode>());
 }
 
-// Manhole ---------------------------------------------------------------------
-Manhole::Manhole(double invert, BENCH_CONFIGURATION bench_config)
-    : invert(invert), bench_config(bench_config),
-      manhole_link(std::make_shared<ManholeLink>()) {}
+// Opening ---------------------------------------------------------------------
+Opening::Opening(std::shared_ptr<HydraulicShape> opening_shape, double Cd,
+                 double invert) {
+  auto opening_link =
+      std::make_shared<OpeningLink>(std::move(opening_shape), Cd, invert);
+  auto up_node = std::make_shared<HydraulicNode>();
+  auto dn_node = std::make_shared<HydraulicNode>();
+  opening_link->get_node<Opening::NODE1>() = up_node;
+  opening_link->get_node<Opening::NODE2>() = dn_node;
+  up_node->links.push_back(opening_link);
+  dn_node->links.push_back(opening_link);
+  nodes.push_back(dn_node);
+  nodes.push_back(up_node);
+  links.push_back(std::move(opening_link));
+}
 
-// Storage ---------------------------------------------------------------------
-Storage::Storage(std::vector<std::pair<double, double>> storage_curve,
-                 double elevation)
-    : storage_curve(storage_curve), elevation(elevation),
-      storage_node(std::make_shared<HydraulicNode>()) {}
-void Storage::bind(std::pair<HydraulicComponent *, unsigned int> bind_point,
-                   unsigned int binding_index) {
-  std::shared_ptr<HydraulicLink> link;
-  if (dynamic_cast<Passage *>(bind_point.first)) {
-    link = std::make_shared<TransitionLink>(1.0);
-  } else {
-    link = std::make_shared<NullLink>();
+// Passage ---------------------------------------------------------------------
+Passage::Passage(std::shared_ptr<HydraulicShape> cross_section_shape,
+                 std::shared_ptr<FrictionMethod> friction_method,
+                 std::vector<vec3> alignment) {
+  // generate passage links
+  for (int i = 0; i < alignment.size() - 1; i++) {
+    auto passage_link = std::make_shared<PassageLink>(
+        cross_section_shape, friction_method,
+        std::make_pair(alignment[i], alignment[i + 1]));
+    links.push_back(std::move(passage_link));
   }
-  bind_components({this, binding_index}, bind_point, link);
+  // generate nodes
+  for (int i = 0; i < alignment.size(); i++) {
+    nodes.push_back(std::make_shared<HydraulicNode>());
+  }
+  // set nodes of links
+  for (int i = 0; i < links.size(); i++) {
+    links[i]->get_node<Passage::NODE1>() = nodes[i];
+    links[i]->get_node<Passage::NODE2>() = nodes[i + 1];
+  }
+  // set links of nodes
+  nodes[0]->links.push_back(links[0]);
+  for (int i = 1; i < nodes.size() - 1; i++) {
+    nodes[i]->links.push_back(links[i - 1]);
+    nodes[i]->links.push_back(links[i]);
+  }
+  nodes.back()->links.push_back(links.back());
+
+  // make the last node the second for indexing
+  std::iter_swap(nodes.begin() + nodes.size() - 1, nodes.begin() + 1);
 }
-HydraulicNode *Storage::get_binding_node(unsigned int binding_index) {
-  return storage_node.get();
-}
+
 } // namespace hazen

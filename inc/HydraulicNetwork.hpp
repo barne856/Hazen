@@ -2,9 +2,12 @@
 #define HYDRAULICNETWORK
 
 // Standard Library
+#include <map>
 #include <memory>
-#include <unordered_map>
-#include <unordered_set>
+#include <mutex>
+#include <thread>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace hazen {
@@ -13,24 +16,26 @@ class HydraulicLink;
 
 /**
  * @brief A Hydraulic Node in a Hydraulic Network.
- * @details A Hydraulic Node contains an unordered set of Hydraulic Links
- * connected to the Hydraulic Node, an unordered set of lateral Point Flows
+ * @details A Hydraulic Node contains a vector of Hydraulic Links
+ * connected to the Hydraulic Node, a vector of lateral Point Flows
  * to the Hydraulic Node, and the total energy head at the Hydraulic Node.
  *
  */
-class HydraulicNode {
+class HydraulicNode : public std::enable_shared_from_this<HydraulicNode> {
 public:
-  HydraulicNode();
-  ~HydraulicNode();
-  double H; /**< The energy head at this Hydraulic Node [UNITS = FT].*/
-  std::unordered_set<HydraulicLink *>
+  double H{0.0}; /**< The energy head at this Hydraulic Node [UNITS = FT].*/
+  std::vector<std::shared_ptr<HydraulicLink>>
       links; /**< Hydraulic Links connected to this Hydraulic Node.*/
   std::vector<double>
       point_flows; /**< The lateral point flows generating additional flow to
                          the Hydraulic Node [UNITS = CFS].*/
-  double continuity(); /**< Returns the sum of the flow into the Hydraulic Node
-                         minus the sum of the flow out of the Hydraulic Node
-                         [UNITS = CFS].*/
+  std::vector<size_t> out_links(); /**< The indices of the outflowing links.*/
+  std::vector<size_t> in_links();  /**< The indices of the inflowing links.*/
+  virtual double continuity();     /**< Returns the sum of the flow into the
+                             Hydraulic Node     minus the sum of the flow out of the
+                             Hydraulic Node     [UNITS = CFS].*/
+  void bind(std::shared_ptr<HydraulicNode>
+                &node); /**< Bind this node to another node.*/
 };
 
 /**
@@ -42,32 +47,32 @@ public:
  */
 class HydraulicLink {
 public:
-  HydraulicLink();
-  ~HydraulicLink();
-  double Q; /**< The signed flow through the Hydraulic Link [UNITS = CFS].*/
-  HydraulicNode *up_node; /**< The upstream Hydraulic Node.*/
-  HydraulicNode *dn_node; /**< The downstream Hydraulic Node.*/
+  double Q{0.0}; /**< The signed flow through the Hydraulic Link [UNITS = CFS].
+               Positive flows from first to second node, negative flows from
+               second to first node.*/
   std::vector<std::pair<double, double>>
       HGL; /**< The HGL profile from downstream node to upstream node.*/
   virtual double
-  head_loss() = 0; /**< Calculate the head loss from the
-                      downstream to the upstream Hydraulic Node [UNITS = FT].*/
+  head_loss(HydraulicNode *node) = 0; /**< Calculate the head loss from the
+ downstream to the upstream Hydraulic Node [UNITS = FT].*/
   /**
-   * @brief Get the maximum water surface elevation of the downstream links
-   * upstream ends.
+   * @brief Get the water surface elevation in this link at the given node.
    *
-   * @return double The downstream water surface elevaiton of this link.
+   * @param node The node to get the water surface elevation at.
+   * @return double The water surface elevation in the link at the node.
    */
-  double get_downstream_water_surface();
-  /**
-   * @brief Get the downstream velocity of the link.
-   * @details The shape of the first downstream passage is used.
-   *
-   * @return double The downstream velocity [UNITS = FPS].
-   */
-  double get_downstream_velocity();
-  void set_up_node(HydraulicNode *node);
-  void set_dn_node(HydraulicNode *node);
+  virtual double get_water_surface_subcritical(HydraulicNode *node) = 0;
+  HydraulicNode *antinode(HydraulicNode *node);
+  template <size_t index> HydraulicNode *node() const {
+    return std::get<index>(nodes).get();
+  }
+  template <size_t index> std::shared_ptr<HydraulicNode> &get_node() {
+    return std::get<index>(nodes);
+  }
+
+private:
+  std::pair<std::shared_ptr<HydraulicNode>, std::shared_ptr<HydraulicNode>>
+      nodes; /**< The nodes connected to the link.*/
 };
 
 /**
@@ -77,24 +82,60 @@ public:
  */
 class HydraulicComponent {
 public:
-  ~HydraulicComponent();
-  virtual void bind(std::pair<HydraulicComponent *, unsigned int> bind_point,
-                    unsigned int binding_index) = 0;
-  void unbind(unsigned int binding_index);
+  virtual ~HydraulicComponent();
+  std::vector<std::shared_ptr<HydraulicLink>> links;
+  template <size_t index> HydraulicNode *node() const {
+    return nodes[index].get();
+  }
+  template <size_t index> std::shared_ptr<HydraulicNode> &get_node() {
+    return nodes[index];
+  }
 
 protected:
-  virtual HydraulicNode *get_binding_node(unsigned int binding_index) = 0;
-  void
-  bind_components(std::pair<HydraulicComponent *, unsigned int> bind_point_1,
-                  std::pair<HydraulicComponent *, unsigned int> bind_point_2,
-                  std::shared_ptr<HydraulicLink> link);
+  std::vector<std::shared_ptr<HydraulicNode>> nodes;
+};
+
+/**
+ * @brief A Hydraulic Network that is used to solve the continuity and head loss
+ * equations for a network of Hydraulic Components.
+ *
+ */
+class HydraulicNetwork {
+public:
+  /**
+   * @brief Push a Hydraulic Component onto the stack. The component must
+   * already be bound to something in the network.
+   *
+   * @param component
+   */
+  void push_component(std::shared_ptr<HydraulicComponent> component);
+  /**
+   * @brief Calculate the flow in - flow out for each node in the network
+   * excluding outfall nodes.
+   *
+   * @param Q The vector of flows for the links in the network.
+   * @return std::vector<double> The continuity equation for all nodes in the
+   * network.
+   */
+  std::vector<double> network_continuity(std::vector<double> Q);
+  double network_energy_head_sse(std::vector<double> Q);
+  /**
+   * @brief The solver for the Hydraulic Network.
+   *
+   * @return bool True if a solution was found, otherwise false.
+   */
+  bool solve();
 
 private:
-  std::unordered_map<unsigned int,
-                     std::pair<HydraulicComponent *, unsigned int>>
-      binding_points;
-  std::unordered_map<unsigned int, std::shared_ptr<HydraulicLink>>
-      binding_links; /**< The binding links of the component.*/
+  void head_loss_branch(HydraulicNode *node);
+  void continuity_branch(HydraulicNode *node);
+  void compute_head_loss_branch(HydraulicLink *link, HydraulicNode *node);
+  std::vector<std::shared_ptr<HydraulicComponent>> components;
+  std::map<HydraulicNode *, std::vector<double>> node_energy_head;
+  std::map<HydraulicNode *, double> node_continuity;
+  std::vector<double> Q_solution;
+  std::mutex node_energy_head_mutex{};
+  std::mutex node_continuity_mutex{};
 };
 
 } // namespace hazen
