@@ -53,18 +53,3 @@ public:
 } // namespace hazen
 
 #endif
-
-// Not yet implemented
-// Manhole
-// Storage
-// Pump
-// in-line minor loss (Reducers/meters/Bends/etc.)
-// Three-way minor loss (Tee/Wye)
-// Four-way minor loss (Cross)
-// Baffle
-// Granular Filter
-// Diffuser
-// Slide Gate
-// Plug Valve
-// Check Valve
-// Flume

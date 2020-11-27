@@ -6,7 +6,7 @@
 #include <functional>
 #include <limits>
 #include <string>
-#include <utility> // std::pair
+#include <utility>
 #include <vector>
 
 namespace hazen {

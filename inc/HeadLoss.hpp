@@ -15,8 +15,6 @@ class HydraulicNode;
 class OpeningLink;
 class TransitionLink;
 class HydraulicShape;
-
-// forward declaration
 struct vec3;
 
 /**
@@ -53,10 +51,66 @@ double vertical_drop_loss(PassageLink *link, HydraulicNode *node);
  */
 double vertical_rise_loss(PassageLink *link, HydraulicNode *node);
 
+/**
+ * @brief Compute the total energy head at the upstream node of a PassageLink
+ * that is backwatered or has a mild slope.
+ * @details This computation solves the gradually varied flow (GVF) equations
+ * using an adaptive step size 5th order accurate Runge-Kutta method. Only
+ * subcritical flow is computed, thus if a hydraulic jump occurs or the head
+ * loss is determined by an upstream control point, the function returns NaN and
+ * records the HGL profile up the the point of supercritical flow.
+ *
+ * @param link The PassageLink
+ * @param node The downstream HydraulicNode
+ * @return double The total energy head at the upstream HydraulicNode opposite
+ * of \p node.
+ */
+
 double backwater_loss(PassageLink *link, HydraulicNode *node);
+/**
+ * @brief Compute the total energy head at the upstream node of a PassageLink
+ * that has a steep slope and has its head loss determined by an upstream
+ * control point.
+ * @details This computation solves the gradually varied flow (GVF) equations
+ * using an adaptive step size 5th order accurate Runge-Kutta method. Only
+ * supercritical flow is computed, thus if a hydraulic jump occured or the head
+ * downstream, the calculation will stop at that point ( See \p jump_x ).
+ *
+ * @param link The PassageLink
+ * @param node The downstream HydraulicNode
+ * @param jump_x The distance along the horizontal direction of the hydraulic
+ * jump if it was previously copmuted using the backwater_loss() function.
+ * @return double The total energy head at the upstream HydraulicNode opposite
+ * of \p node.
+ */
 double frontwater_loss(PassageLink *link, HydraulicNode *node,
                        double jump_x = 0.0);
+
+/**
+ * @brief Compute the total energy head at the upstream node of an OpeningLink.
+ * @details An OpeningLink can be used to model an orifice or a weir. It is
+ * assumed that there will be no approach velocity and the upstream total energy
+ * head is the same as the upstream water surface elevation.
+ *
+ * @param link The OpeningLink
+ * @param node The downstream HydraulicNode
+ * @return double The total energy head at the upstream HydraulicNode opposite
+ * of \p node.
+ */
 double opening_loss(OpeningLink *link, HydraulicNode *node);
+
+/**
+ * @brief Compute the total energy head at the upstream node of a
+ * TransitionLink.
+ * @details The Borda-Carnot Equation is used to model gradual and aprupt
+ * transitions (expansion and contraction) in open channel and closed conduit
+ * flow.
+ *
+ * @param link The TransitionLink.
+ * @param node The upstream HydraulicNode.
+ * @return double The total energy head at the upstream HydraulicNode opposite
+ * of \p node.
+ */
 double transition_loss(TransitionLink *link, HydraulicNode *node);
 
 /**

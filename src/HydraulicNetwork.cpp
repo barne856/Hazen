@@ -247,8 +247,25 @@ bool HydraulicNetwork::solve() {
       std::bind(&HydraulicNetwork::network_continuity, this,
                 std::placeholders::_1),
       0.000001, 1000);
-  std::cout << network_energy_head_sse(Q_solution) << std::endl;
   return true;
+}
+
+std::vector<std::pair<double, double>>
+HydraulicNetwork::draw_HGL_profile(std::vector<HydraulicLink *> links) {
+  std::vector<std::pair<double, double>> result{};
+  double x_start = 0.0;
+  for (auto &link : links) {
+    for (auto &[x, h] : link->HGL) {
+      result.push_back({x_start + x, h});
+    }
+    x_start += link->HGL.back().first;
+  }
+  return result;
+}
+
+void HydraulicNetwork::export_HGL_profile(std::string output_filepath,
+                                          std::vector<HydraulicLink *> links) {
+  write_csv(output_filepath, gen_table(draw_HGL_profile(links), "x", "h"));
 }
 
 } // namespace hazen

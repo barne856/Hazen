@@ -257,115 +257,6 @@ double find_goal_inverse_quadratic(double goal, double x0, double x1, double x2,
   return result;
 }
 
-std::vector<double> unconstrained_solver_secant(
-    std::vector<double> x0, double TOL,
-    std::function<double(std::vector<double>)> objective, const int MAX_ITER) {
-  // allocate space for result and fill with zeros
-  size_t n = x0.size();
-  std::vector<double> result{};
-  result.resize(n);
-  // allocate space for x1 and initialize to x0 + TOL
-  std::vector<double> x1 = x0;
-  for (int i = 0; i < n; i++) {
-    x1[i] += TOL;
-  }
-  // allocate space for x2 and fill with zeros
-  std::vector<double> x2;
-  x2.resize(n);
-
-  // iterate until convergence
-  try {
-    double convergence = 2 * TOL;
-    int iters = 0;
-    double f_x0 = objective(x0);
-    double f_x1 = objective(x1);
-    while (iters < MAX_ITER && TOL < convergence) {
-      double t = f_x1 / (f_x1 - f_x0);
-      for (int i = 0; i < n; i++) {
-        x2[i] = x1[i] - t * (x1[i] - x0[i]);
-      }
-      x0 = x1;
-      x1 = x2;
-      f_x0 = f_x1;
-      f_x1 = objective(x1);
-      convergence = abs(f_x1);
-      iters++;
-    }
-    if (iters == MAX_ITER) {
-      throw nr_except;
-    }
-    result = x2;
-  } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
-    result.resize(n, nan(""));
-  }
-  return result;
-}
-
-std::vector<double> constrained_solver_secant(
-    std::vector<double> x0, double TOL,
-    std::function<double(std::vector<double>)> objective,
-    std::function<std::vector<double>(std::vector<double>)> constraints,
-    const int MAX_ITER) {
-
-  // allocate space for result and fill with zeros
-  std::vector<double> result{};
-  std::vector<double> x1 = x0;
-  std::vector<double> x2;
-  std::vector<double> lambda0{};
-  std::vector<double> lambda1{};
-  std::vector<double> lambda2;
-  size_t n = x0.size();
-  size_t c = constraints(x0).size();
-  result.resize(n);
-  for (int i = 0; i < n; i++) {
-    x1[i] += TOL;
-  }
-  x2.resize(n);
-  lambda0.resize(c, 1.0);
-  lambda1.resize(c, 1.0 + TOL);
-  lambda2.resize(c);
-  // define the lagrangian of the system
-  std::function<double(std::vector<double>, std::vector<double>)> L =
-      [=](std::vector<double> x, std::vector<double> lambda) -> double {
-    std::vector<double> g = constraints(x);
-    return objective(x) -
-           std::inner_product(g.begin(), g.end(), lambda.begin(), 0.0);
-  };
-  // iterate until convergence
-  try {
-    double convergence = 2 * TOL;
-    int iters = 0;
-    double L_x0 = L(x0, lambda0);
-    double L_x1 = L(x1, lambda1);
-    while (iters < MAX_ITER && TOL < convergence) {
-      double step = L_x1 / (L_x1 - L_x0);
-      for (int i = 0; i < n; i++) {
-        x2[i] = x1[i] - step * (x1[i] - x0[i]);
-      }
-      for (int i = 0; i < c; i++) {
-        lambda2[i] = lambda1[i] - step * (lambda1[i] - lambda0[i]);
-      }
-      x0 = x1;
-      x1 = x2;
-      lambda0 = lambda1;
-      lambda1 = lambda2;
-      L_x0 = L_x1;
-      L_x1 = L(x1, lambda1);
-      convergence = abs(L_x1);
-      iters++;
-    }
-    if (iters == MAX_ITER) {
-      throw nr_except;
-    }
-    result = x2;
-  } catch (const std::exception &e) {
-    std::cerr << e.what() << '\n';
-    result.resize(n, nan(""));
-  }
-  return result;
-}
-
 template <typename T> struct square {
   T operator()(const T &Left, const T &Right) const {
     return (Left + Right * Right);
@@ -425,64 +316,7 @@ void print_mat(mat matrix) {
   }
 }
 
-void pivot(mat &Ab) {
-  int m = Ab.size();
-  int n = Ab[0].size() - 1;
-  for (int i = m - 1; i > 0; i--) // partial pivoting
-  {
-    if (Ab[i - 1][0] < Ab[i][0])
-      for (int j = 0; j <= n; j++) {
-        double c = Ab[i][j];
-        Ab[i][j] = Ab[i - 1][j];
-        Ab[i - 1][j] = c;
-      }
-  }
-}
-
-void forward_elim(mat &Ab) {
-  int m = Ab.size();
-  int n = Ab[0].size() - 1;
-  for (int k = 0; k < m - 1; k++)
-    for (int i = k; i < m - 1; i++) {
-      double c = (Ab[i + 1][k] / Ab[k][k]);
-
-      for (int j = 0; j <= n; j++)
-        Ab[i + 1][j] -= c * Ab[k][j];
-    }
-}
-
-vec back_sub(const mat &Ab) {
-  vec x{}; // A vec to store solution
-  int m = Ab.size();
-  int n = Ab[0].size() - 1;
-  x.resize(m);
-  for (int i = m - 1; i >= 0; i--) {
-    double c = 0;
-    for (int j = i; j <= n - 1; j++)
-      c = c + Ab[i][j] * x[j];
-
-    x[i] = (Ab[i][n] - c) / Ab[i][i];
-  }
-  return x;
-}
-
 vec solve_linear_system(const mat &A, const vec &b) {
-  // create augmented matrix Ab
-  mat Ab{};
-  for (int i = 0; i < A.size(); i++) {
-    vec row = A[i];
-    row.push_back(b[i]);
-    Ab.push_back(row);
-  }
-  // partial pivoting
-  pivot(Ab);
-  // reduce to r.e.f.
-  forward_elim(Ab);
-  // solve for x
-  return back_sub(Ab);
-}
-
-vec gauss(const mat &A, const vec &b) {
   mat Ab{};
   for (int i = 0; i < A.size(); i++) {
     vec row = A[i];
@@ -673,7 +507,7 @@ std::vector<double> find_root_generalized_newton(
     std::vector<double> F_x0 = objective(x0);
     while (iters < MAX_ITER && TOL < convergence) {
       std::vector<std::vector<double>> JF = Jacobian(x0, F_x0, objective, TOL);
-      vec delta_x = gauss(JF, F_x0);
+      vec delta_x = solve_linear_system(JF, F_x0);
       for (int i = 0; i < x0.size(); i++) {
         x0[i] -= delta_x[i];
       }

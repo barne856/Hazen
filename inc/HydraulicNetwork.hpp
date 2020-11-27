@@ -84,15 +84,13 @@ class HydraulicComponent {
 public:
   virtual ~HydraulicComponent();
   std::vector<std::shared_ptr<HydraulicLink>> links;
+  std::vector<std::shared_ptr<HydraulicNode>> nodes;
   template <size_t index> HydraulicNode *node() const {
     return nodes[index].get();
   }
   template <size_t index> std::shared_ptr<HydraulicNode> &get_node() {
     return nodes[index];
   }
-
-protected:
-  std::vector<std::shared_ptr<HydraulicNode>> nodes;
 };
 
 /**
@@ -125,6 +123,10 @@ public:
    * @return bool True if a solution was found, otherwise false.
    */
   bool solve();
+  static std::vector<std::pair<double, double>>
+  draw_HGL_profile(std::vector<HydraulicLink *> links);
+  static void export_HGL_profile(std::string output_filepath,
+                                 std::vector<HydraulicLink *> links);
 
 private:
   void head_loss_branch(HydraulicNode *node);

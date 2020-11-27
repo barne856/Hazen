@@ -7,7 +7,7 @@
 namespace hazen {
 /**
  * @brief An Abstract Friction Method used to calculate head losses in the
- * Conduit Hydraulic Link.
+ * Passage Hydraulic Link.
  */
 class FrictionMethod {
 public:
@@ -109,7 +109,7 @@ public:
   double friction_slope(HydraulicShape *shape, double Q, double depth);
 
 private:
-  double eps; /**< epsilon pipe roughness coefficient used in the Darcy-Weisbach
+  double eps; /**< epsilon, pipe roughness coefficient used in the Darcy-Weisbach
      Equation. Dimension matches that of the Hydraulic Shape [UNITS = FT].*/
   double rho; /**< Density of the fluid [UNITS = SLUG/CF].*/
   double mu;  /**< Dynamic Viscosity of the fluid [UNIT = PSF*S].*/
