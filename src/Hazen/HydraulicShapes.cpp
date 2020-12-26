@@ -31,7 +31,7 @@ Length HydraulicShape::get_shape_height() { return height; }
 Dimensionless HydraulicShape::froude(Flow Q, Length depth) {
   return depth.val <= 0.0
              ? Dimensionless(std::numeric_limits<double>::infinity())
-             : hazen::froude(Q / flow_area(depth), hydraulic_depth(depth));
+             : hazen::froude(Velocity(Q.val / flow_area(depth).val), hydraulic_depth(depth));
 }
 bool HydraulicShape::is_free_surface(Length depth) {
   return !is_open && depth >= height ? false : true;

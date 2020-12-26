@@ -199,8 +199,6 @@ private:
    */
   std::map<HydraulicLink *, Length> energy_head_residual_map();
 
-  Dimensionless Lagrangian(const Vec<Dimensionless> &x);
-
   Vec<Dimensionless> initialize_solution() {
     Vec<Flow> Q(link_head.size());
     head_loss(Q);
@@ -209,7 +207,6 @@ private:
     for (size_t i = 0; i < Q.size(); i++) {
       auto Q1 = Q;
       Q1.elems(i) += 1.0;
-      head_loss(Q1);
       auto CE1 = flow_continuity_error();
       J.elems.col(i) = (CE1 - CE).elems;
     }
@@ -225,7 +222,7 @@ private:
     Vec<Dimensionless> result(i);
     for (size_t j = 0; j < link_head.size(); j++) {
       result.elems(j) = Q.elems(j);
-      if(std::abs(Q.elems(j)) < 1e-8)
+      if(std::abs(Q.elems(j)) < 1e-3)
       {
         result.elems(j) = 0.0;
       }

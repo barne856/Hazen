@@ -71,7 +71,8 @@ Angle PassageLink::hydrualic_slope_subcritical(Length x, Length h,
     // force subcritical flow
     Fr_squared = Dimensionless(1.0) - TOL;
   }
-  return (Sf * a - S) / (Dimensionless(1.0) - Fr_squared) + S;
+  Angle result = (Sf * a - S) / (Dimensionless(1.0) - Fr_squared) + S;
+  return result;
 }
 Angle PassageLink::hydrualic_slope_supercritical(Length x, Length h,
                                                  HydraulicNode *node) const {
@@ -124,9 +125,6 @@ Length PassageLink::head_loss(HydraulicNode *node) {
     std::sort(HGL.begin(), HGL.end());
   }
   up_node->H = H;
-  // if (isnan(H.val)) {
-  //   std::cout << "Whoopsie" << std::endl;
-  // }
   return H;
 }
 Length PassageLink::get_water_surface_subcritical(HydraulicNode *node) const {

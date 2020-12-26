@@ -25,7 +25,7 @@ Dimensionless froude(Velocity V, Length h) {
   }
   Dimensionless Fr{0.0};
   try {
-    Fr = abs(V) / sqrt(g * h);
+    Fr = Dimensionless(std::abs(V.val) / std::sqrt(g.val * h.val));
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';
     Fr = Dimensionless(std::numeric_limits<double>::infinity());
@@ -107,11 +107,12 @@ Length critical_depth(HydraulicShape *shape, Flow Q) {
     return Length(std::numeric_limits<double>::infinity());
   }
   if (Q.val <= TOL.val) {
-    if (Q.val == 0.0) {
+    if (Q.val <= 0.0) {
       return Length(0.0);
     }
-    return Length(TOL);
+    return Length(power<2, 3>(Q).val);
   }
+
   // define function to use with bisection method
   std::function<Dimensionless(Length)> objective =
       [shape, Q](Length depth) -> Dimensionless {
@@ -137,22 +138,13 @@ Length critical_depth(HydraulicShape *shape, Flow Q) {
                                                     TOL.val, objective);
 }
 
-Length brink_depth(HydraulicShape *shape, FrictionMethod *friction, Angle S,
-                   Flow Q) {
-  Length Dn = normal_depth(shape, friction, S, Q);
-  Length Dc = critical_depth(shape, Q);
-  if (isnan(Dn.val) || isinf(Dn.val)) {
-    return Dc;
-  }
-  return Length(std::min(Dn.val, Dc.val));
-}
-
-std::vector<Vec<Length>> gen_alignment(Angle slope, Length reach) {
+std::vector<Vec<Length>> gen_alignment(Angle slope, Length reach, Length down_invert) {
   Vec<Length> dn_vert(3);
   Vec<Length> up_vert(3);
+  dn_vert.elems(2) = down_invert.val;
   up_vert.elems(0) = reach.val;
   up_vert.elems(1) = 0.0;
-  up_vert.elems(2) = slope.as_slope() * reach.val;
+  up_vert.elems(2) = slope.as_slope() * reach.val + dn_vert.elems(2);
   return {up_vert, dn_vert};
 }
 

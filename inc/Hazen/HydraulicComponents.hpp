@@ -4,6 +4,8 @@
 #include "Hazen/HydraulicNetwork.hpp"
 
 namespace hazen {
+  using Alignment = typename std::vector<Vec<Length>>;
+
 /**
  * @brief A Node Component in a Hydraulic Network.
  *

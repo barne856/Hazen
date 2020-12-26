@@ -1,37 +1,22 @@
 #include "Hazen/HydraulicComponents.hpp"
 
-#include <iostream>
-#include <stdlib.h> /* srand, rand */
-#include <time.h>   /* time */
-
 using namespace hazen;
 
 int main() {
-  // srand(time(NULL));
-  // int N = 20;
-  // Mat<Dimensionless> A(N, N);
-  // for (int i = 0; i < N; i++) {
-  //   for (int j = 0; j < N; j++) {
-  //     A(i, j) = Dimensionless(static_cast<double>(rand() % 100));
-  //   }
-  // }
-  // std::cout << "inversion begin: " << std::endl;
-  // auto B = inv(A);
-  // std::cout << "inversion end: " << std::endl;
 
   // Define Network Information
-  Flow Q_total = Flow::MGD(3.5); // flow at node F
-  Length H_init = 5.1_m;         // energy head at node F
+  Flow Q_total = Flow::CMS(250.0); // flow at node F
+  Length H_init = 5.0_m;           // energy head at node F
 
   // Define Component Information
-  auto shape_1 = gen_ref<Circle>(Length::Inches(18.0));
-  auto shape_2 = gen_ref<Circle>(Length::Inches(24.0));
-  auto shape_3 = gen_ref<Circle>(Length::Inches(18.0));
-  auto shape_4 = gen_ref<Circle>(Length::Inches(12.0));
-  auto shape_5 = gen_ref<Circle>(Length::Inches(12.0));
-  auto shape_6 = gen_ref<Circle>(Length::Inches(12.0));
-  auto shape_7 = gen_ref<Circle>(Length::Inches(18.0));
-  auto shape_8 = gen_ref<Circle>(Length::Inches(24.0));
+  auto shape_1 = gen_ref<Trapezoid>(Angle::Slope(1.0 / 1.5), 30.0_m, 100.0_m);
+  auto shape_2 = gen_ref<Trapezoid>(Angle::Slope(1.0 / 1.5), 40.0_m, 100.0_m);
+  auto shape_3 = gen_ref<Trapezoid>(Angle::Slope(1.0 / 1.5), 20.0_m, 100.0_m);
+  auto shape_4 = gen_ref<Trapezoid>(Angle::Slope(1.0 / 1.5), 20.0_m, 100.0_m);
+  auto shape_5 = gen_ref<Trapezoid>(Angle::Slope(1.0 / 1.5), 20.0_m, 100.0_m);
+  auto shape_6 = gen_ref<Trapezoid>(Angle::Slope(1.0 / 1.5), 25.0_m, 100.0_m);
+  auto shape_7 = gen_ref<Trapezoid>(Angle::Slope(1.0 / 1.5), 30.0_m, 100.0_m);
+  auto shape_8 = gen_ref<Trapezoid>(Angle::Slope(1.0 / 1.5), 50.0_m, 100.0_m);
   auto friction_1 = gen_ref<ManningsFriction>(0.013_pure);
   auto friction_2 = gen_ref<ManningsFriction>(0.013_pure);
   auto friction_3 = gen_ref<ManningsFriction>(0.012_pure);
@@ -40,14 +25,14 @@ int main() {
   auto friction_6 = gen_ref<ManningsFriction>(0.013_pure);
   auto friction_7 = gen_ref<ManningsFriction>(0.014_pure);
   auto friction_8 = gen_ref<ManningsFriction>(0.014_pure);
-  auto alignment_1 = gen_alignment(Angle::Slope(0.0005), 200.0_m);
-  auto alignment_2 = gen_alignment(Angle::Slope(0.0005), 200.0_m);
-  auto alignment_3 = gen_alignment(Angle::Slope(0.0005), 200.0_m);
-  auto alignment_4 = gen_alignment(Angle::Slope(0.0005), 100.0_m);
-  auto alignment_5 = gen_alignment(Angle::Slope(0.0005), 100.0_m);
-  auto alignment_6 = gen_alignment(Angle::Slope(0.0005), 100.0_m);
-  auto alignment_7 = gen_alignment(Angle::Slope(0.0005), 100.0_m);
-  auto alignment_8 = gen_alignment(Angle::Slope(0.0005), 300.0_m);
+  auto alignment_1 = gen_alignment(Angle::Slope(0.0005), 200.0_m, 0.15_m);
+  auto alignment_2 = gen_alignment(Angle::Slope(0.0005), 200.0_m, 0.15_m);
+  auto alignment_3 = gen_alignment(Angle::Slope(0.0005), 200.0_m, 0.05_m);
+  auto alignment_4 = gen_alignment(Angle::Slope(0.0005), 100.0_m, 0.1_m);
+  auto alignment_5 = gen_alignment(Angle::Slope(0.0005), 100.0_m, 0.05_m);
+  auto alignment_6 = gen_alignment(Angle::Slope(0.0005), 100.0_m, 0.1_m);
+  auto alignment_7 = gen_alignment(Angle::Slope(0.0005), 100.0_m, 0.0_m);
+  auto alignment_8 = gen_alignment(Angle::Slope(0.0005), 300.0_m, 0.0_m);
 
   // Define Components
   auto node_F = gen_ref<ConstantHeadNode>(H_init);

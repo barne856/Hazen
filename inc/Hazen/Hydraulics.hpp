@@ -118,26 +118,12 @@ Length normal_depth(HydraulicShape *shape, FrictionMethod *friction, Angle S,
  */
 Length critical_depth(HydraulicShape *shape, Flow Q);
 
-/**
- * @brief Compute the brink depth of a passage.
- * @details The Brink Depth is the minimum of the uniform (normal) depth and the
- * critical depth of the flow through the passage.
- *
- * @param shape The cross-sectional shape of the passage.
- * @param friction The friction method to use in the calculation.
- * @param S The slope of the passage.
- * @param Q The flow to use in the calculation.
- * @return The brink depth of the passage.
- */
-Length brink_depth(HydraulicShape *shape, FrictionMethod *friction, Angle S,
-                   Flow Q);
-
 // Helper Functions ------------------------------------------------------------
 template <typename T> using HazenRef = std::shared_ptr<T>;
 template <typename T, typename... Args> HazenRef<T> gen_ref(Args... args) {
   return std::make_shared<T>(args...);
 }
-std::vector<Vec<Length>> gen_alignment(Angle slope, Length reach);
+std::vector<Vec<Length>> gen_alignment(Angle slope, Length reach, Length down_invert);
 
 // namespace csv_util {
 // /**

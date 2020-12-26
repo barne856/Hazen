@@ -139,83 +139,53 @@ void HydraulicNetwork::head_loss(const Vec<Flow> &Q) {
   }
 }
 
-Dimensionless HydraulicNetwork::Lagrangian(const Vec<Dimensionless> &x) {
-  Vec<Flow> Q(link_head.size());
-  for (size_t i = 0; i < Q.size(); i++) {
-    Q.elems(i) = x.elems(i);
-  }
-  head_loss(Q);
-  auto continuity_error = flow_continuity_error();
-  auto head_residual = energy_head_residual();
-  Vec<Dimensionless> lambda(continuity_error.size());
-  size_t j = Q.size();
-  for (size_t i = 0; i < continuity_error.size(); i++) {
-    lambda.elems(i) = x.elems(i + j);
-  }
-
-  return Dimensionless(squared_norm(head_residual).val -
-                       dot_product(lambda, continuity_error).val);
-}
-
 Vec<Dimensionless> HydraulicNetwork::objective(const Vec<Dimensionless> &x0) {
 
-  double TOL = 1e-4;
   Vec<Dimensionless> result(x0.size());
-  auto f0 = Lagrangian(x0);
-  for (size_t i = 0; i < result.size(); i++) {
-    auto x1 = x0;
-    x1.elems(i) += TOL;
-    auto f1 = Lagrangian(x1);
-    result.elems(i) = (f1.val - f0.val) / TOL;
+  Vec<Flow> Q(link_head.size());
+  for (size_t i = 0; i < Q.size(); i++) {
+    Q.elems(i) = x0.elems(i);
+  }
+  head_loss(Q);
+  auto continuity_error_map = flow_continuity_error_map();
+  auto head_residual_map = energy_head_residual_map();
+  Vec<Dimensionless> lambda(continuity_error_map.size());
+  size_t j = Q.size();
+  for (size_t i = 0; i < continuity_error_map.size(); i++) {
+    lambda.elems(i) = x0.elems(i + j);
+  }
+
+  size_t i = 0;
+  // add f - (lambda_dn - lambda_up) to result
+  for (const auto &[link, h] : head_residual_map) {
+    // auto up_node = link_upstream_node[link];
+    // auto dn_node = link->antinode(up_node);
+    // size_t up_index = std::distance(continuity_error_map.begin(),
+    //                                 continuity_error_map.find(up_node));
+    // size_t dn_index = std::distance(continuity_error_map.begin(),
+    //                                 continuity_error_map.find(dn_node));
+    // double l_up =
+    //     up_index < continuity_error_map.size() ? lambda.elems(up_index) :
+    //     0.0;
+    // double l_dn =
+    //     dn_index < continuity_error_map.size() ? lambda.elems(dn_index) :
+    //     0.0;
+    // result.elems(i) = h.val - (l_dn - l_up);
+    result.elems(i) = h.val;
+    i++;
+  }
+  // add continuity to result
+  for (const auto &[node, c] : continuity_error_map) {
+    result.elems(i) = c.val;
+    i++;
   }
 
   return result;
-
-  //  Vec<Dimensionless> result(x0.size());
-  //  Vec<Flow> Q(link_head.size());
-  //  for (size_t i = 0; i < Q.size(); i++) {
-  //    Q.elems(i) = x0.elems(i);
-  //  }
-  //  head_loss(Q);
-  //  auto continuity_error_map = flow_continuity_error_map();
-  //  auto head_residual_map = energy_head_residual_map();
-  //  Vec<Dimensionless> lambda(continuity_error_map.size());
-  //  size_t j = Q.size();
-  //  for (size_t i = 0; i < continuity_error_map.size(); i++) {
-  //    lambda.elems(i) = x0.elems(i + j);
-  //  }
-  //
-  //  size_t i = 0;
-  //  // add f - (lambda_dn - lambda_up) to result
-  //  for (const auto &[link, h] : head_residual_map) {
-  //    auto up_node = link_upstream_node[link];
-  //    auto dn_node = link->antinode(up_node);
-  //    size_t up_index = std::distance(continuity_error_map.begin(),
-  //                                    continuity_error_map.find(up_node));
-  //    size_t dn_index = std::distance(continuity_error_map.begin(),
-  //                                    continuity_error_map.find(dn_node));
-  //    double l_up =
-  //        up_index < continuity_error_map.size() ? lambda.elems(up_index) :
-  //        0.0;
-  //    double l_dn =
-  //        dn_index < continuity_error_map.size() ? lambda.elems(dn_index) :
-  //        0.0;
-  //    result.elems(i) = h.val - (l_dn - l_up);
-  //    i++;
-  //  }
-  //  // add continuity to result
-  //  for (const auto &[node, c] : continuity_error_map) {
-  //    result.elems(i) = c.val;
-  //    i++;
-  //  }
-  //
-  //  return result;
 }
 
 Mat<Dimensionless> HydraulicNetwork::Jacobian(const Vec<Dimensionless> &x,
                                               Dimensionless dx) {
   size_t n = x.size();
-  Vec<Dimensionless> zero(n);
   Mat<Dimensionless> result(n, n);
   Vec<Dimensionless> f1 = objective(x);
   for (int i = 0; i < result.n_cols(); i++) {
@@ -223,7 +193,6 @@ Mat<Dimensionless> HydraulicNetwork::Jacobian(const Vec<Dimensionless> &x,
     x2.elems(i) += dx.val;
     Vec<Dimensionless> f2 = objective(x2);
     result.elems.col(i) = ((f2 - f1) / dx).elems;
-    i++;
   }
   return result;
 }
@@ -290,42 +259,60 @@ std::map<HydraulicLink *, Length> HydraulicNetwork::energy_head_residual_map() {
 
 void HydraulicNetwork::solve() {
   // iteration parameters
-  double TOL = 1e-2;
+  double TOL = 1e-8;
   int MAX_ITER = 5000;
   std::cout << "Solution Begin --------------------" << std::endl;
   auto start = std::chrono::high_resolution_clock::now();
 
   // find least squares solution
-  auto x1 = initialize_solution();
-  Vec<Dimensionless> x0(x1.size());
+  auto x0 = initialize_solution();
   Vec<Dimensionless> F0 = objective(x0);
-  Vec<Dimensionless> F1 = objective(x1);
-  std::cout << "F =\n" << F1 << std::endl;
-  x1.elems(1) += TOL;
-  F1 = objective(x1);
-  std::cout << "F =\n" << F1 << std::endl;
-  // Broyden's method
+  auto J = Jacobian(x0, Dimensionless(TOL));
+  auto dx = hazen::solve_least_squares(J, -F0);
+  auto x1 = x0 + dx;
+  auto F1 = objective(x1);
+  auto dF = F1 - F0;
+
   double convergence = 2 * TOL;
   int iters = 0;
+  double c = 0.5;
+  Dimensionless alpha(1.0);
   // iterate until convergence
   while (iters < MAX_ITER && TOL < convergence) {
+    // Broyden's method
     // J += ((dF - J * dx) / squared_norm(dx)) * transpose(dx);
-    auto J = Jacobian(x1, Dimensionless(TOL));
-    auto dx = hazen::solve_least_squares(J, -F1);
-    x1 += dx;
+    // finite differnece Jacobian
+    J = Jacobian(x1, Dimensionless(TOL));
+    // J = Jacobian(x1, Dimensionless(squared_norm(dx).val));
+
+    dx = hazen::solve_least_squares(J, -F1);
+
+    // auto m = dot_product(F1, dx);
+    // if (m.val >= 0.0) {
+    //   J = Jacobian(x1, Dimensionless(TOL));
+    //   alpha = 1.0_pure;
+    //   std::cout << "Broyden Failed" << std::endl;
+    // } else {
+    //   auto F_test = objective(x1 + dx * alpha);
+    //   auto dF_test = norm(F_test) - norm(F1);
+    //   if (dF_test.val >= 0.0) {
+    //     alpha = c * alpha;
+    //     continue;
+    //   }
+    // }
+
     x0 = x1;
+    x1 += dx * alpha;
     F0 = F1;
     F1 = objective(x1);
-
-    // std::cout << "J =\n" << J << std::endl;
+    dF = F1 - F0;
 
     // affine invariant stopping criteria (works with any scale of problem)
-    // convergence = dot_product(abs(F1), abs(dQ)).val;
+    // convergence = sqrt(dot_product(abs(F1), abs(dx))).val;
 
     // non-affine invariant stopping criteria
     convergence = norm(F1).val;
-    // std::cout << F1 << std::endl;
-    std::cout << iters << ": " << convergence << std::endl;
+
     iters++;
   }
   if (iters == MAX_ITER) {

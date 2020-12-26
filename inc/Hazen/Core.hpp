@@ -384,7 +384,7 @@ public:
 template <> class Scalar<Velocity_Unit> {
 public:
   constexpr Scalar() : val{} {}
-  explicit constexpr Scalar(double d) : val{} {}
+  explicit constexpr Scalar(double d) : val{d} {}
   static constexpr Velocity MPS(double d) { return Velocity(d); }
   static constexpr Velocity FPS(double d) { return Velocity(d * 0.3048); }
   constexpr double as_meters_per_second() const { return val; }
