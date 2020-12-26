@@ -27,7 +27,7 @@ set(LIB_SRC
 )
 
 set(TEST_SRC
-./src/tests/hydraulic_util_test.cpp)
+./src/tests/channel_series_test.cpp)
 
 add_library(HAZEN SHARED ${LIB_SRC})
 

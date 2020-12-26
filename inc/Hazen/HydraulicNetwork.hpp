@@ -43,6 +43,7 @@ public:
   void bind(std::shared_ptr<HydraulicNode>
                 &node); /**< Bind this node to another node.*/
   bool is_constant_head = false;
+  bool is_open_to_atmosphere = true;
 };
 
 /**

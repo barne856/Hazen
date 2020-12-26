@@ -138,7 +138,8 @@ Length critical_depth(HydraulicShape *shape, Flow Q) {
                                                     TOL.val, objective);
 }
 
-std::vector<Vec<Length>> gen_alignment(Angle slope, Length reach, Length down_invert) {
+std::vector<Vec<Length>> gen_alignment(Angle slope, Length reach,
+                                       Length down_invert) {
   Vec<Length> dn_vert(3);
   Vec<Length> up_vert(3);
   dn_vert.elems(2) = down_invert.val;
@@ -148,54 +149,61 @@ std::vector<Vec<Length>> gen_alignment(Angle slope, Length reach, Length down_in
   return {up_vert, dn_vert};
 }
 
-// std::vector<std::pair<std::string, std::vector<double>>>
-// csv_util::gen_table(std::vector<std::pair<double, double>> values,
-//                     std::string label1, std::string label2) {
-//   std::vector<double> vec1{};
-//   std::vector<double> vec2{};
-//   for (auto [x, y] : values) {
-//     vec1.push_back(x);
-//     vec2.push_back(y);
-//   }
-//   std::vector<std::pair<std::string, std::vector<double>>> cols{};
-//   cols.push_back({label1, vec1});
-//   cols.push_back({label2, vec2});
-//   return cols;
-// }
-//
-// void csv_util::write_csv(
-//     std::string filename,
-//     std::vector<std::pair<std::string, std::vector<double>>> dataset) {
-//   // Make a CSV file with one or more columns of integer values
-//   // Each column of data is represented by the pair <column name, column
-//   data>
-//   //   as std::pair<std::string, std::vector<double>>
-//   // The dataset is represented as a vector of these columns
-//   // Note that all columns should be the same size
-//
-//   // Create an output filestream object
-//   std::ofstream myFile(filename);
-//
-//   // Send column names to the stream
-//   for (int j = 0; j < dataset.size(); ++j) {
-//     myFile << dataset.at(j).first;
-//     if (j != dataset.size() - 1)
-//       myFile << ","; // No comma at end of line
-//   }
-//   myFile << "\n";
-//
-//   // Send data to the stream
-//   for (int i = 0; i < dataset.at(0).second.size(); ++i) {
-//     for (int j = 0; j < dataset.size(); ++j) {
-//       myFile << dataset.at(j).second.at(i);
-//       if (j != dataset.size() - 1)
-//         myFile << ","; // No comma at end of line
-//     }
-//     myFile << "\n";
-//   }
-//
-//   // Close the file
-//   myFile.close();
-// }
+std::vector<std::pair<std::string, std::vector<double>>>
+csv_util::gen_table(std::vector<std::pair<Length, Length>> values,
+                    std::string label1, std::string label2, CSV_UNITS units) {
+  std::vector<double> vec1{};
+  std::vector<double> vec2{};
+  for (auto [x, y] : values) {
+    switch (units) {
+    case CSV_UNITS::FEET:
+      vec1.push_back(x.as_feet());
+      vec2.push_back(y.as_feet());
+      break;
+
+    default:
+      vec1.push_back(x.val);
+      vec2.push_back(y.val);
+      break;
+    }
+  }
+  std::vector<std::pair<std::string, std::vector<double>>> cols{};
+  cols.push_back({label1, vec1});
+  cols.push_back({label2, vec2});
+  return cols;
+}
+
+void csv_util::write_csv(
+    std::string filename,
+    std::vector<std::pair<std::string, std::vector<double>>> dataset) {
+  // Make a CSV file with one or more columns of integer values
+  // Each column of data is represented by the pair <column name, column data >
+  // as std::pair<std::string, std::vector<double>> The dataset is represented
+  // as a vector of these columns Note that all columns should be the same size
+
+  // Create an output filestream object
+  std::ofstream myFile(filename);
+
+  // Send column names to the stream
+  for (int j = 0; j < dataset.size(); ++j) {
+    myFile << dataset.at(j).first;
+    if (j != dataset.size() - 1)
+      myFile << ","; // No comma at end of line
+  }
+  myFile << "\n";
+
+  // Send data to the stream
+  for (int i = 0; i < dataset.at(0).second.size(); ++i) {
+    for (int j = 0; j < dataset.size(); ++j) {
+      myFile << dataset.at(j).second.at(i);
+      if (j != dataset.size() - 1)
+        myFile << ","; // No comma at end of line
+    }
+    myFile << "\n";
+  }
+
+  // Close the file
+  myFile.close();
+}
 
 } // namespace hazen

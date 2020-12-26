@@ -95,7 +95,8 @@ Angle PassageLink::hydrualic_slope_supercritical(Length x, Length h,
     // force supercritical flow
     Fr_squared = Dimensionless(1.0) + TOL;
   }
-  return (Sf * a - S) / (Dimensionless(1.0) - Fr_squared) + S;
+  Angle result = (Sf * a - S) / (Dimensionless(1.0) - Fr_squared) + S;
+  return result;
 }
 
 Length PassageLink::head_loss(HydraulicNode *node) {
@@ -128,6 +129,11 @@ Length PassageLink::head_loss(HydraulicNode *node) {
   return H;
 }
 Length PassageLink::get_water_surface_subcritical(HydraulicNode *node) const {
+  if (!node->is_open_to_atmosphere) {
+    Length D = cross_section_shape->get_max_depth();
+    Length hv = velocity_head(D);
+    return node->H - hv;
+  }
   std::function<Length(Length)> objective = [=](Length h) {
     Angle S = slope(node);
     Dimensionless a = sqrt(S * S + Dimensionless(1.0));
@@ -140,6 +146,11 @@ Length PassageLink::get_water_surface_subcritical(HydraulicNode *node) const {
   return h;
 }
 Length PassageLink::get_water_surface_supercritical(HydraulicNode *node) const {
+  if (!node->is_open_to_atmosphere) {
+    Length D = cross_section_shape->get_max_depth();
+    Length hv = velocity_head(D);
+    return node->H - hv;
+  }
   std::function<Length(Length)> objective = [=](Length h) {
     Angle S = slope(node);
     Dimensionless a = sqrt(S * S + Dimensionless(1.0));

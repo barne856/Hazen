@@ -18,6 +18,12 @@ Length vertical_drop_loss(PassageLink *link, HydraulicNode *node) {
     link->HGL.push_back({Length(0.0), up_node->H});
     return H;
   }
+  bool atmosphere = true;
+  if (!node->is_open_to_atmosphere &&
+      !link->cross_section_shape->is_free_surface(
+          link->cross_section_shape->get_max_depth())) {
+    atmosphere = false;
+  }
   Length D = link->cross_section_shape->get_max_depth();
   Length h = link->get_water_surface_subcritical(node);
   Length inv = link->invert(node);
@@ -27,9 +33,10 @@ Length vertical_drop_loss(PassageLink *link, HydraulicNode *node) {
   Length l = link->length();
   Length hv = link->velocity_head(D);
 
-  if (inv > h) { // check if discharge is open to atmosphere
+  if (inv > h && atmosphere) { // check if discharge is open to atmosphere
     dh = Length(0.0);
-  } else if (dh + d > l) { // check if upstream head will be above the pipe
+  } else if (dh + d > l ||
+             !atmosphere) { // check if upstream head will be above the pipe
     dh = Sf * l;
   }
 
@@ -38,6 +45,16 @@ Length vertical_drop_loss(PassageLink *link, HydraulicNode *node) {
   link->antinode(node)->H = H;
   link->HGL.push_back({Length(0.0), h});
   link->HGL.push_back({Length(0.0), h + dh});
+  // if WSE is below the pipe invert, return an upstream H that is the minimum
+  // stating elevation for the upstream pipe
+  Rectangle P(link->cross_section_shape->wetted_perimeter(
+                  link->cross_section_shape->get_max_depth()),
+              100.0_m);
+  Length dc = critical_depth(&P, abs(link->Q));
+  Length H_min = link->invert(link->antinode(node)) + dc;
+  if (H < H_min && atmosphere) {
+    H = H_min;
+  }
   return H;
 }
 
@@ -52,6 +69,12 @@ Length vertical_rise_loss(PassageLink *link, HydraulicNode *node) {
     link->HGL.push_back({Length(0.0), up_node->H});
     return H;
   }
+  bool atmosphere = true;
+  if (!node->is_open_to_atmosphere &&
+      !link->cross_section_shape->is_free_surface(
+          link->cross_section_shape->get_max_depth())) {
+    atmosphere = false;
+  }
   Length D = link->cross_section_shape->get_max_depth();
   Length h = link->get_water_surface_subcritical(node);
   Length inv = link->invert(node);
@@ -62,6 +85,9 @@ Length vertical_rise_loss(PassageLink *link, HydraulicNode *node) {
   Rectangle rect = Rectangle(P, Length(1.0), true);
   Length d = Length(
       std::max(critical_depth(&rect, abs(link->Q)).val, (h.val - inv.val)));
+  if (!atmosphere) {
+    d = h - inv;
+  }
   Length H = inv + d + hv + Sf * l;
 
   // record results
@@ -105,6 +131,18 @@ Length backwater_loss(PassageLink *link, HydraulicNode *node) {
     h = link->get_water_surface_supercritical(node);
   } else {
     h = link->get_water_surface_subcritical(node);
+  }
+  if (!node->is_open_to_atmosphere &&
+      !link->cross_section_shape->is_free_surface(
+          link->cross_section_shape->get_max_depth())) {
+    Length D = link->cross_section_shape->get_max_depth();
+    Angle Sf = link->friction_slope(D);
+    Length L = link->length();
+    Length hv = link->velocity_head(D);
+    Length H = h + Sf * L + hv;
+    link->HGL.push_back({Length(0.0), node->H - hv});
+    link->HGL.push_back({Length(0.0), H - hv});
+    return H;
   }
   Angle S = link->slope(node);
   Dimensionless a = sqrt(S * S + Dimensionless(1.0));
@@ -179,7 +217,7 @@ Length frontwater_loss(PassageLink *link, HydraulicNode *node, Length jump_x) {
     Length z = S * x + link->invert(node);
     Length d = (h - z) / a;
     if (d > dc) {
-      return false;
+      return true; // no need to check this for frontwater loss
     } else {
       return true;
     }
@@ -208,6 +246,18 @@ Length opening_loss(OpeningLink *link, HydraulicNode *node) {
     link->HGL.push_back({Length(0.0), H});
     return H;
   }
+  if (!node->is_open_to_atmosphere &&
+      !link->cross_section_shape->is_free_surface(
+          link->cross_section_shape->get_max_depth())) {
+    Velocity V = link->Q / link->Cd /
+                 link->cross_section_shape->flow_area(
+                     link->cross_section_shape->get_max_depth());
+    Length hL = V * V / 2.0 / g;
+    Length H = node->H + hL;
+    link->HGL.push_back({Length(0.0), node->H});
+    link->HGL.push_back({Length(0.0), H});
+    return H;
+  }
   Length h = link->get_water_surface_subcritical(node);
   Length d2 = Length(std::max(h.val - link->elevation.val, 0.0));
   link->HGL.push_back({Length(0.0), h});
@@ -232,6 +282,31 @@ Length transition_loss(TransitionLink *link, HydraulicNode *node) {
     up_node->H = H;
     link->HGL.push_back({Length(0.0), node->H});
     link->HGL.push_back({Length(0.0), H});
+    return H;
+  }
+  if (!node->is_open_to_atmosphere &&
+      !link->shapes.second->is_free_surface(
+          link->shapes.second->get_max_depth())) {
+    Velocity V2 = link->velocity(node, link->shapes.second->get_max_depth());
+    Velocity V1 = link->velocity(link->antinode(node),
+                                 link->shapes.first->get_max_depth());
+    Length hL = link->K * abs2(V1 - V2) / 2.0 / g;
+    if (V1 < V2) {
+      // use velocity in the vena contracta
+      Dimensionless mu =
+          Dimensionless(0.63) +
+          Dimensionless(0.37) *
+              Dimensionless(pow(V1.val / V2.val, 3.0)); // according to Weisbach
+      Velocity V3 = V2 / mu;
+      hL = link->K * abs2(V3 - V2) / 2.0 / g;
+    }
+    Length H = node->H + hL;
+    Length hv1 = link->velocity_head(link->antinode(node),
+                                     link->shapes.first->get_max_depth());
+    Length hv2 =
+        link->velocity_head(node, link->shapes.second->get_max_depth());
+    link->HGL.push_back({Length(0.0), node->H - hv2});
+    link->HGL.push_back({Length(0.0), H - hv1});
     return H;
   }
   Length h = link->get_water_surface_subcritical(node);

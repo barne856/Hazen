@@ -123,38 +123,43 @@ template <typename T> using HazenRef = std::shared_ptr<T>;
 template <typename T, typename... Args> HazenRef<T> gen_ref(Args... args) {
   return std::make_shared<T>(args...);
 }
-std::vector<Vec<Length>> gen_alignment(Angle slope, Length reach, Length down_invert);
+std::vector<Vec<Length>> gen_alignment(Angle slope, Length reach,
+                                       Length down_invert);
 
-// namespace csv_util {
-// /**
-//  * @brief Generate a table for exporting to a csv file from a vector of
-//  pairs of
-//  * doubles.
-//  *
-//  * @param values A vector of pairs of doubles.
-//  * @param label1 The label for the first entry in the pairs.
-//  * @param label2 The label for the second entry in the pairs.
-//  * @return std::vector<std::pair<std::string, std::vector<double>>> The
-//  table
-//  * for writing to a csv file.
-//  */
-// std::vector<std::pair<std::string, std::vector<double>>>
-// gen_table(std::vector<std::pair<double, double>> values, std::string
-// label1,
-//           std::string label2);
-//
-// /**
-//  * @brief Write a CSV file with double type data in columns and string type
-//  data
-//  * in headers.
-//  *
-//  * @param filename The output filepath
-//  * @param dataset The data to write
-//  */
-// void write_csv(
-//     std::string filename,
-//     std::vector<std::pair<std::string, std::vector<double>>> dataset);
-// } // namespace csv_util
+namespace csv_util {
+
+enum class CSV_UNITS {
+  FEET = 0,
+  METERS,
+};
+
+/**
+ * @brief Generate a table for exporting to a csv file from a vector of pairs of
+ Lengths.
+ *
+ * @param values A vector of pairs of doubles.
+ * @param label1 The label for the first entry in the pairs.
+ * @param label2 The label for the second entry in the pairs.
+ * @return std::vector<std::pair<std::string, std::vector<double>>> The
+ table
+ * for writing to a csv file.
+ */
+std::vector<std::pair<std::string, std::vector<double>>>
+gen_table(std::vector<std::pair<Length, Length>> values, std::string label1,
+          std::string label2, CSV_UNITS units);
+
+/**
+ * @brief Write a CSV file with double type data in columns and string type
+ data
+ * in headers.
+ *
+ * @param filename The output filepath
+ * @param dataset The data to write
+ */
+void write_csv(
+    std::string filename,
+    std::vector<std::pair<std::string, std::vector<double>>> dataset);
+} // namespace csv_util
 
 } // namespace hazen
 #endif

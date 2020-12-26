@@ -53,6 +53,7 @@ public:
           std::shared_ptr<FrictionMethod> friction_method,
           std::vector<Vec<Length>> alignment);
   enum binding_point { NODE1 = 0, NODE2 };
+  
 };
 
 } // namespace hazen
