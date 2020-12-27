@@ -1,0 +1,3 @@
+[submodule "ext/Eigen"]
+	path = ext/Eigen
+	url = https://github.com/libigl/eigen
