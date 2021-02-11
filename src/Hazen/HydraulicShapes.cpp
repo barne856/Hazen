@@ -31,7 +31,8 @@ Length HydraulicShape::get_shape_height() { return height; }
 Dimensionless HydraulicShape::froude(Flow Q, Length depth) {
   return depth.val <= 0.0
              ? Dimensionless(std::numeric_limits<double>::infinity())
-             : hazen::froude(Velocity(Q.val / flow_area(depth).val), hydraulic_depth(depth));
+             : hazen::froude(Velocity(Q.val / flow_area(depth).val),
+                             hydraulic_depth(depth));
 }
 bool HydraulicShape::is_free_surface(Length depth) {
   return !is_open && depth >= height ? false : true;
@@ -95,6 +96,9 @@ Area Rectangle::flow_area(Length depth) {
   }
   return width * depth;
 }
+
+Length Rectangle::get_width() { return width; }
+Length Rectangle::get_height() { return height; }
 
 // V-Notch ---------------------------------------------------------------------
 VNotch::VNotch(Angle angle, Length overflow_width, Length height, bool is_open)

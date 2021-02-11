@@ -132,6 +132,8 @@ public:
   Length top_width(Length depth) override;
   Length wetted_perimeter(Length depth) override;
   Area flow_area(Length depth) override;
+  Length get_width();
+  Length get_height();
 
 private:
   Length width; /**< The horizontal width of the Rectangle.*/

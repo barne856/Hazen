@@ -169,6 +169,13 @@ public:
       inverts; /**< The invert elevations of the transition shapes.*/
 };
 
+class SpecialLossLink : public HydraulicLink {
+public:
+  Length head_loss(HydraulicNode *node);
+  std::vector<Flow> Q_vec;
+  std::vector<Length> h_vec;
+};
+
 // class ManholeLink : public HydraulicLink {
 // public:
 //   ManholeLink(double elevation, BENCH_CONFIGURATION bench_config);

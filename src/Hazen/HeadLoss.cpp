@@ -347,6 +347,56 @@ Length transition_loss(TransitionLink *link, HydraulicNode *node) {
   return z1 + d1 + link->velocity_head(up_node, d1);
 }
 
+Length special_loss(SpecialLossLink *link, HydraulicNode *node) {
+  // assert Q_vec.size() >= 2
+  assert(link->Q_vec.size() >= 2);
+  // assert Q_vec.size() == h_vec.size()
+  assert(link->Q_vec.size() == link->h_vec.size());
+
+  // sort table in accending order of Q
+
+  // declare variables for the two closest points in the table
+  Length h1, h2;
+  Flow Q1, Q2;
+  // energy head == WSE
+  Length downstream_wse = node->H;
+
+  // handle overshooting
+  int last_index = link->Q_vec.size() - 1;
+  if (link->Q >= link->Q_vec[last_index]) {
+    h1 = link->h_vec[last_index - 1];
+    h2 = link->h_vec[last_index];
+    Q1 = link->Q_vec[last_index - 1];
+    Q2 = link->Q_vec[last_index];
+    // compute the slope of the line of the two closest points
+    auto slope = (h2 - h1) / (Q2 - Q1);
+    // return the value of the WSE upstream of the headloss
+    return downstream_wse + slope * (link->Q - Q1);
+  }
+  // handle undershooting
+  // if Q3 < Q_vec[0], return downstream_wse
+  if (link->Q < link->Q_vec[0]) {
+    return downstream_wse;
+  }
+
+  // loop through Q_vec
+  for (int i = 0; i < link->Q_vec.size(); i++) {
+    // find the first flow in the table that is greater than Q3
+    if (link->Q_vec[i] > link->Q) {
+      // set the value of the two closest points to Q3
+      h1 = link->h_vec[i - 1];
+      h2 = link->h_vec[i];
+      Q1 = link->Q_vec[i - 1];
+      Q2 = link->Q_vec[i];
+    }
+  }
+
+  // compute the slope of the line of the two closest points
+  auto slope = (h2 - h1) / (Q2 - Q1);
+  // return the value of the WSE upstream of the headloss
+  return downstream_wse + slope * (link->Q - Q1);
+}
+
 // double benching_coefficient(BENCH_CONFIGURATION bench, double D, double d) {
 //   double x0 = 1.0, x1 = 2.5, y0, y1;
 //   switch (bench) {

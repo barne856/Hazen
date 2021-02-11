@@ -114,6 +114,8 @@ Length opening_loss(OpeningLink *link, HydraulicNode *node);
  */
 Length transition_loss(TransitionLink *link, HydraulicNode *node);
 
+Length special_loss(std::vector<Flow> Q_vec, std::vector<Length> h_vec, Flow Q, Length h);
+
 // /**
 //  * @brief An enum class to describe the type of benching in a manhole.
 //  * @details See FHWA HEC-22 Figure 7-6.

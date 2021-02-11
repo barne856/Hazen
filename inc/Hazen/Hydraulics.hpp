@@ -120,7 +120,7 @@ Length critical_depth(HydraulicShape *shape, Flow Q);
 
 // Helper Functions ------------------------------------------------------------
 template <typename T> using HazenRef = std::shared_ptr<T>;
-template <typename T, typename... Args> HazenRef<T> gen_ref(Args... args) {
+template <typename T, typename... Args> HazenRef<T> make_ref(Args... args) {
   return std::make_shared<T>(args...);
 }
 std::vector<Vec<Length>> gen_alignment(Angle slope, Length reach,
